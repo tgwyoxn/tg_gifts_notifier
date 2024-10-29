@@ -54,6 +54,10 @@ At first rename `config.example.py` to `config.py`.
 
 Then, you must configure the notifier by editing the `config.example.py` file.
 
+### Note
+
+Currently it is not available to send star gift with text. Seems like problem in [pyrofork](https://github.com/Mayuri-Chan/pyrofork).
+
 ## Contact
 
 For any questions or feedback, please contact me at [my socials](https://aryn.sek.su/).

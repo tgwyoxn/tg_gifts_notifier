@@ -7,3 +7,4 @@
 *.session
 *.service
 config.py
+!requirements.txt
