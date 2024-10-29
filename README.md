@@ -4,6 +4,8 @@
 
 TG Gifts Notifier is a tool designed to notify users about new gifts available on the Telegram platform. It helps users stay updated and never miss out on any gifts.
 
+Our Telegram Channel — [Gifts Detector](https://t.me/gifts_detector)
+
 ## Features
 
 - Real-time notifications
@@ -47,4 +49,4 @@ Then, you must configure the notifier by editing the `config.example.py` file.
 
 ## Contact
 
-For any questions or feedback, please contact me at [my socials](aryn.sek.su).
+For any questions or feedback, please contact me at [my socials](https://aryn.sek.su/).

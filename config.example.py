@@ -6,7 +6,7 @@ API_HASH: str = "1234"
 
 CHECK_INTERVAL: float = 90.
 
-NOTIFY_CHAT_ID: int = -1002452764624
+NOTIFY_CHAT_ID: int = -1002452764624  # https://t.me/gifts_detector
 NOTIFY_AFTER_STICKER_DELAY: float = 1.
 NOTIFY_AFTER_TEXT_DELAY: float = 2.
 
