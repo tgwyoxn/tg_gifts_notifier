@@ -1,0 +1,8 @@
+.*/
+**test**
+*.sh
+*.txt
+*.json
+*.session
+*.service
+config.py
