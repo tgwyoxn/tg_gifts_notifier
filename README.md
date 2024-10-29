@@ -42,9 +42,16 @@ To start the notifier, run:
 python detector.py
 ```
 
+To start the auto buyer, run:
+
+```sh
+python auto_buyer.py
+```
+
 ## Configuration
 
 At first rename `config.example.py` to `config.py`.
+
 Then, you must configure the notifier by editing the `config.example.py` file.
 
 ## Contact

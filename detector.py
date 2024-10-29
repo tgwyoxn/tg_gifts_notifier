@@ -12,11 +12,12 @@ import config
 null_str: str = ""
 
 
-async def detector(app: Client, callback: typing.Callable) -> None:
+async def detector(app: Client, callback: typing.Callable, connect_every_loop: bool=True) -> None:
     while True:
-        print("Loop started")
+        print("Checking...")
 
-        await app.start()
+        if not app.is_connected:
+            await app.start()
 
         old_star_gifts_raw: list[dict]
 
@@ -80,7 +81,8 @@ async def detector(app: Client, callback: typing.Callable) -> None:
                     ensure_ascii = False
                 )
 
-        await app.stop()
+        if connect_every_loop:
+            await app.stop()
 
         await asyncio.sleep(config.CHECK_INTERVAL)
 
@@ -101,9 +103,47 @@ def pretty_float(number: float, get_is_same: bool=False) -> tuple[str, bool] | s
     return number_str
 
 
-async def notify(app: Client, star_gift_raw: dict) -> None:
+def get_notify_text(star_gift_raw: dict) -> str:
     is_limited: bool = star_gift_raw["is_limited"]
 
+    available_percentage, available_percentage_is_same = pretty_float(
+        number = math.ceil(star_gift_raw["available_amount"] / star_gift_raw["total_amount"] * 100 * 100) / 100,
+        get_is_same = True
+    )
+
+    return config.NOTIFY_TEXT.format(
+        title = config.NOTIFY_TEXT_TITLES[is_limited],
+        number = star_gift_raw.pop("number"),
+        id = star_gift_raw["id"],
+        total_amount = (
+            config.NOTIFY_TEXT_TOTAL_AMOUNT.format(
+                total_amount = pretty_int(star_gift_raw["total_amount"])
+            )
+            if is_limited
+            else
+            null_str
+        ),
+        available_amount = (
+            config.NOTIFY_TEXT_AVAILABLE_AMOUNT.format(
+                available_amount = pretty_int(star_gift_raw["available_amount"]),
+                same_str = (
+                    null_str
+                    if available_percentage_is_same
+                    else
+                    "~"
+                ),
+                available_percentage = available_percentage
+            )
+            if is_limited
+            else
+            null_str
+        ),
+        price = pretty_int(star_gift_raw["price"]),
+        convert_price = pretty_int(star_gift_raw["convert_price"])
+    )
+
+
+async def notify(app: Client, star_gift_raw: dict) -> None:
     binary: BytesIO = await app.download_media(
         message = star_gift_raw["sticker"]["file_id"],
         in_memory = True
@@ -121,43 +161,9 @@ async def notify(app: Client, star_gift_raw: dict) -> None:
 
     await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
 
-    available_percentage, available_percentage_is_same = pretty_float(
-        number = math.ceil(star_gift_raw["available_amount"] / star_gift_raw["total_amount"] * 100 * 100) / 100,
-        get_is_same = True
-    )
-
     await app.send_message(
         chat_id = config.NOTIFY_CHAT_ID,
-        text = config.NOTIFY_TEXT.format(
-            title = config.NOTIFY_TEXT_TITLES[is_limited],
-            number = star_gift_raw.pop("number"),
-            id = star_gift_raw["id"],
-            total_amount = (
-                config.NOTIFY_TEXT_TOTAL_AMOUNT.format(
-                    total_amount = pretty_int(star_gift_raw["total_amount"])
-                )
-                if is_limited
-                else
-                null_str
-            ),
-            available_amount = (
-                config.NOTIFY_TEXT_AVAILABLE_AMOUNT.format(
-                    available_amount = pretty_int(star_gift_raw["available_amount"]),
-                    same_str = (
-                        ""
-                        if available_percentage_is_same
-                        else
-                        "~"
-                    ),
-                    available_percentage = available_percentage
-                )
-                if is_limited
-                else
-                null_str
-            ),
-            price = pretty_int(star_gift_raw["price"]),
-            convert_price = pretty_int(star_gift_raw["convert_price"])
-        ),
+        text = get_notify_text(star_gift_raw),
         reply_to_message_id = sticker_message.id
     )
 

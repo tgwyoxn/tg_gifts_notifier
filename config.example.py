@@ -27,3 +27,11 @@ NOTIFY_TEXT_TITLES: dict[bool, str] = {
 
 NOTIFY_TEXT_TOTAL_AMOUNT: str = "\n🎯 Total amount: {total_amount}"
 NOTIFY_TEXT_AVAILABLE_AMOUNT: str = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%)\n"
+
+
+GIFT_CHAT_IDS: list[int] = [
+    794823214,  # @arynme
+]
+
+GIFT_TEXT: str = "🎁 Gift №{number} ({id})"
+GIFT_HIDE_MY_NAME: bool = True
