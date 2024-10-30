@@ -1,2 +1,3 @@
 pyrofork == 2.3.48
 tgcrypto-pyrofork == 1.2.7
+numpy == 2.1.2

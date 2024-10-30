@@ -6,6 +6,7 @@ import math
 import asyncio
 import typing
 
+import utils
 import config
 
 
@@ -87,26 +88,10 @@ async def detector(app: Client, callback: typing.Callable, connect_every_loop: b
         await asyncio.sleep(config.CHECK_INTERVAL)
 
 
-def pretty_int(number: int) -> str:
-    return "{:,}".format(number)
-
-
-def pretty_float(number: float, get_is_same: bool=False) -> tuple[str, bool] | str:
-    number_str: str = "{:.1g}".format(float(number))
-
-    if get_is_same:
-        return (
-            number_str,
-            float(number_str) == number
-        )
-
-    return number_str
-
-
 def get_notify_text(star_gift_raw: dict) -> str:
     is_limited: bool = star_gift_raw["is_limited"]
 
-    available_percentage, available_percentage_is_same = pretty_float(
+    available_percentage, available_percentage_is_same = utils.pretty_float(
         number = math.ceil(star_gift_raw["available_amount"] / star_gift_raw["total_amount"] * 100 * 100) / 100,
         get_is_same = True
     )
@@ -117,7 +102,7 @@ def get_notify_text(star_gift_raw: dict) -> str:
         id = star_gift_raw["id"],
         total_amount = (
             config.NOTIFY_TEXT_TOTAL_AMOUNT.format(
-                total_amount = pretty_int(star_gift_raw["total_amount"])
+                total_amount = utils.pretty_int(star_gift_raw["total_amount"])
             )
             if is_limited
             else
@@ -125,7 +110,7 @@ def get_notify_text(star_gift_raw: dict) -> str:
         ),
         available_amount = (
             config.NOTIFY_TEXT_AVAILABLE_AMOUNT.format(
-                available_amount = pretty_int(star_gift_raw["available_amount"]),
+                available_amount = utils.pretty_int(star_gift_raw["available_amount"]),
                 same_str = (
                     null_str
                     if available_percentage_is_same
@@ -138,8 +123,8 @@ def get_notify_text(star_gift_raw: dict) -> str:
             else
             null_str
         ),
-        price = pretty_int(star_gift_raw["price"]),
-        convert_price = pretty_int(star_gift_raw["convert_price"])
+        price = utils.pretty_int(star_gift_raw["price"]),
+        convert_price = utils.pretty_int(star_gift_raw["convert_price"])
     )
 
 
