@@ -61,3 +61,11 @@ Currently it is not available to send star gift with text. Seems like problem in
 ## Contact
 
 For any questions or feedback, please contact me at [my socials](https://aryn.sek.su/).
+
+---
+
+If you find TG Gifts Notifier useful and would like to support its development, consider making a donation. Your contributions help in maintaining and improving the project.
+
+You can donate via the following methods: [@adonates_mv](https://t.me/adonates_mv/2)
+
+Thank you for your support!

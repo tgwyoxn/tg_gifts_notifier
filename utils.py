@@ -1,4 +1,11 @@
+from datetime import datetime
+from pytz.tzinfo import BaseTzInfo
+
 import numpy as np
+
+
+def get_current_datetime(timezone: BaseTzInfo) -> str:
+    return datetime.now().astimezone(timezone).strftime("%d-%m-%Y %H:%M:%S")
 
 
 def pretty_int(number: int) -> str:

@@ -1,5 +1,6 @@
 from pyrogram import Client, types
 from io import BytesIO
+from pytz import timezone as _timezone
 
 import json
 import math
@@ -10,10 +11,12 @@ import utils
 import config
 
 
+timezone = _timezone(config.TIMEZONE)
+
 null_str: str = ""
 
 
-async def detector(app: Client, callback: typing.Callable, connect_every_loop: bool=True) -> None:
+async def detector(app: Client, new_callback: typing.Callable, update_callback: typing.Callable, connect_every_loop: bool=True) -> None:
     while True:
         print("Checking...")
 
@@ -23,7 +26,7 @@ async def detector(app: Client, callback: typing.Callable, connect_every_loop: b
         old_star_gifts_raw: list[dict]
 
         try:
-            with open("star_gifts.json", "r") as file:
+            with config.DATA_FILEPATH.open("r") as file:
                 old_star_gifts_raw = json.load(file)
 
         except FileNotFoundError:
@@ -55,11 +58,11 @@ async def detector(app: Client, callback: typing.Callable, connect_every_loop: b
             if key not in old_star_gifts_raw_dict
         }
 
+        all_star_gifts_ids: list[int] = list(all_star_gifts_raw_dict.keys())
+        all_star_gifts_amount: int = len(all_star_gifts_ids)
+
         if new_star_gifts_raw:
             print("New star gifts found:", len(new_star_gifts_raw))
-
-            all_star_gifts_ids: list[int] = list(all_star_gifts_raw_dict.keys())
-            all_star_gifts_amount: int = len(all_star_gifts_ids)
 
             for star_gift_id, star_gift_raw in new_star_gifts_raw.items():
                 star_gift_raw["number"] = all_star_gifts_amount - all_star_gifts_ids.index(star_gift_id)
@@ -68,19 +71,31 @@ async def detector(app: Client, callback: typing.Callable, connect_every_loop: b
                 new_star_gifts_raw.items(),
                 key = lambda it: it[1]["number"]
             ):
-                await callback(
+                await new_callback(
                     app,
                     star_gift_raw
                 )
 
-            with open("star_gifts.json", "w") as file:
-                json.dump(
-                    obj = all_star_gifts_raw,
-                    fp = file,
-                    indent = 4,
-                    default = types.Object.default,
-                    ensure_ascii = False
-                )
+        if update_callback:
+            for old_star_gift_raw in old_star_gifts_raw_dict.values():
+                new_star_gift_raw: dict = all_star_gifts_raw_dict[old_star_gift_raw["id"]]
+                old_available_amount: int = old_star_gift_raw.get("available_amount", 0)
+
+                if old_available_amount > 0 and new_star_gift_raw["available_amount"] < old_available_amount:
+                    await update_callback(
+                        app,
+                        old_star_gift_raw,
+                        new_star_gift_raw
+                    )
+
+        with config.DATA_FILEPATH.open("w") as file:
+            json.dump(
+                obj = all_star_gifts_raw,
+                fp = file,
+                indent = 4,
+                default = types.Object.default,
+                ensure_ascii = False
+            )
 
         if connect_every_loop:
             await app.stop()
@@ -117,7 +132,8 @@ def get_notify_text(star_gift_raw: dict) -> str:
                     else
                     "~"
                 ),
-                available_percentage = available_percentage
+                available_percentage = available_percentage,
+                updated_datetime = utils.get_current_datetime(timezone)
             )
             if is_limited
             else
@@ -128,7 +144,7 @@ def get_notify_text(star_gift_raw: dict) -> str:
     )
 
 
-async def notify(app: Client, star_gift_raw: dict) -> None:
+async def new_callback(app: Client, star_gift_raw: dict) -> None:
     binary: BytesIO = await app.download_media(
         message = star_gift_raw["sticker"]["file_id"],
         in_memory = True
@@ -146,13 +162,26 @@ async def notify(app: Client, star_gift_raw: dict) -> None:
 
     await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
 
-    await app.send_message(
+    message: types.Message = await app.send_message(
         chat_id = config.NOTIFY_CHAT_ID,
         text = get_notify_text(star_gift_raw),
         reply_to_message_id = sticker_message.id
     )
 
+    star_gift_raw["message_id"] = message.id
+
     await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
+
+
+async def update_callback(app: Client, old_star_gift_raw: dict, new_star_gift_raw: dict) -> None:
+    if "message_id" not in old_star_gift_raw:
+        return
+
+    await app.edit_message_text(
+        chat_id = config.NOTIFY_CHAT_ID,
+        text = get_notify_text(new_star_gift_raw),
+        message_id = old_star_gift_raw["message_id"]
+    )
 
 
 async def main() -> None:
@@ -164,7 +193,8 @@ async def main() -> None:
 
     await detector(
         app = app,
-        callback = notify
+        new_callback = new_callback,
+        update_callback = update_callback
     )
 
 

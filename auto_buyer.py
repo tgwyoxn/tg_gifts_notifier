@@ -17,7 +17,7 @@ async def buyer(app: Client, chat_id: int, star_gift_id: int, text: str | None=c
     print("Star gift successfully bought to {}!".format(chat_id))
 
 
-async def callback(app: Client, star_gift_raw: dict) -> None:
+async def new_callback(app: Client, star_gift_raw: dict) -> None:
     print(get_notify_text(star_gift_raw))
 
     for chat_id in config.GIFT_CHAT_IDS:
@@ -41,5 +41,5 @@ async def main() -> None:
 
     await detector(
         app = app,
-        callback = callback
+        new_callback = new_callback
     )
