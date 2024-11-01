@@ -106,10 +106,11 @@ async def detector(app: Client, new_callback: typing.Callable, update_callback: 
 def get_notify_text(star_gift_raw: dict) -> str:
     is_limited: bool = star_gift_raw["is_limited"]
 
-    available_percentage, available_percentage_is_same = utils.pretty_float(
-        number = math.ceil(star_gift_raw["available_amount"] / star_gift_raw["total_amount"] * 100 * 100) / 100,
-        get_is_same = True
-    )
+    if is_limited:
+        available_percentage, available_percentage_is_same = utils.pretty_float(
+            number = math.ceil(star_gift_raw["available_amount"] / star_gift_raw["total_amount"] * 100 * 100) / 100,
+            get_is_same = True
+        )
 
     return config.NOTIFY_TEXT.format(
         title = config.NOTIFY_TEXT_TITLES[is_limited],
