@@ -77,9 +77,11 @@ async def detector(app: Client, new_callback: typing.Callable, update_callback: 
                 )
 
         if update_callback:
-            for old_star_gift_raw in old_star_gifts_raw_dict.values():
-                new_star_gift_raw: dict = all_star_gifts_raw_dict[old_star_gift_raw["id"]]
+            for star_gift_id, old_star_gift_raw in old_star_gifts_raw_dict.items():
+                new_star_gift_raw: dict = all_star_gifts_raw_dict[star_gift_id]
                 old_available_amount: int = old_star_gift_raw.get("available_amount", 0)
+
+                new_star_gift_raw["number"] = all_star_gifts_amount - all_star_gifts_ids.index(star_gift_id)
 
                 if old_available_amount > 0 and new_star_gift_raw["available_amount"] < old_available_amount:
                     await update_callback(
@@ -183,6 +185,8 @@ async def update_callback(app: Client, old_star_gift_raw: dict, new_star_gift_ra
         text = get_notify_text(new_star_gift_raw),
         message_id = old_star_gift_raw["message_id"]
     )
+
+    await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
 
 async def main() -> None:
