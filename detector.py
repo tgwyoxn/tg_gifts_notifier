@@ -79,11 +79,14 @@ async def detector(app: Client, new_callback: typing.Callable, update_callback: 
         if update_callback:
             for star_gift_id, old_star_gift_raw in old_star_gifts_raw_dict.items():
                 new_star_gift_raw: dict = all_star_gifts_raw_dict[star_gift_id]
-                old_available_amount: int = old_star_gift_raw.get("available_amount", 0)
+                old_available_amount: int = old_star_gift_raw.get("available_amount", -1)
+
+                if "message_id" in old_star_gift_raw:
+                    new_star_gift_raw["message_id"] = old_star_gift_raw["message_id"]
 
                 new_star_gift_raw["number"] = all_star_gifts_amount - all_star_gifts_ids.index(star_gift_id)
 
-                if old_available_amount > 0 and new_star_gift_raw["available_amount"] < old_available_amount:
+                if old_available_amount > -1 and new_star_gift_raw["available_amount"] < old_available_amount:
                     await update_callback(
                         app,
                         old_star_gift_raw,
@@ -177,13 +180,13 @@ async def new_callback(app: Client, star_gift_raw: dict) -> None:
 
 
 async def update_callback(app: Client, old_star_gift_raw: dict, new_star_gift_raw: dict) -> None:
-    if "message_id" not in old_star_gift_raw:
+    if "message_id" not in new_star_gift_raw:
         return
 
     await app.edit_message_text(
         chat_id = config.NOTIFY_CHAT_ID,
         text = get_notify_text(new_star_gift_raw),
-        message_id = old_star_gift_raw["message_id"]
+        message_id = new_star_gift_raw["message_id"]
     )
 
     await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
@@ -203,4 +206,5 @@ async def main() -> None:
     )
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

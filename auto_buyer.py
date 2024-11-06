@@ -1,6 +1,8 @@
 from pyrogram import Client
 from pyrogram.errors.exceptions import RPCError
 
+import asyncio
+
 from detector import detector, get_notify_text
 
 import config
@@ -43,3 +45,7 @@ async def main() -> None:
         app = app,
         new_callback = new_callback
     )
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
