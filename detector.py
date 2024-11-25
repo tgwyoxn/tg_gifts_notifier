@@ -1,4 +1,5 @@
 from pyrogram import Client, types
+from pyrogram.errors import exceptions
 from io import BytesIO
 from pytz import timezone as _timezone
 
@@ -183,11 +184,15 @@ async def update_callback(app: Client, old_star_gift_raw: dict, new_star_gift_ra
     if "message_id" not in new_star_gift_raw:
         return
 
-    await app.edit_message_text(
-        chat_id = config.NOTIFY_CHAT_ID,
-        text = get_notify_text(new_star_gift_raw),
-        message_id = new_star_gift_raw["message_id"]
-    )
+    try:
+        await app.edit_message_text(
+            chat_id = config.NOTIFY_CHAT_ID,
+            text = get_notify_text(new_star_gift_raw),
+            message_id = new_star_gift_raw["message_id"]
+        )
+
+    except exceptions.MessageNotModified:
+        pass
 
     await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
