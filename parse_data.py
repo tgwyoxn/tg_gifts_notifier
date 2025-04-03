@@ -39,7 +39,7 @@ async def get_all_star_gifts(
     all_star_gifts_dict: dict[int, StarGiftData] = {
         star_gift_raw.id: StarGiftData(
             id = star_gift_raw.id,
-            number = i,
+            number = number,
             sticker_file_id = FileId(
                 file_type = FileType.DOCUMENT,
                 dc_id = star_gift_raw.sticker.dc_id,  # type: ignore
@@ -61,7 +61,7 @@ async def get_all_star_gifts(
             total_amount = star_gift_raw.availability_total or 0,
             is_limited = star_gift_raw.limited or False
         )
-        for i, star_gift_raw in enumerate(sorted(
+        for number, star_gift_raw in enumerate(sorted(
             r_gifts,
             key = lambda star_gift_raw: star_gift_raw.id,
             reverse = False

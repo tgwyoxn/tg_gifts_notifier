@@ -14,7 +14,7 @@ class StrippingFormatter(logging.Formatter):
 
         return super().format(record)
 
-def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> logging.LoggerAdapter[logging.Logger]:
+def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> logging.LoggerAdapter[typing.Any]:
     logger = logging.getLogger(name)
 
     logger.setLevel(min(console_log_level, file_log_level))

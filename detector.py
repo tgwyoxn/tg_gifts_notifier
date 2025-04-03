@@ -34,15 +34,16 @@ if not config.BOT_TOKENS:
 BOTS_AMOUNT = len(config.BOT_TOKENS)
 
 
-_http_transport = AsyncHTTPTransport()
+if BOTS_AMOUNT > 0:
+    _http_transport = AsyncHTTPTransport()
 
-BOT_HTTP_CLIENTS = cycle([
-    AsyncClient(
-        base_url = f"https://api.telegram.org/bot{bot_token}",
-        transport = _http_transport
-    )
-    for bot_token in config.BOT_TOKENS
-])
+    BOT_HTTP_CLIENTS = cycle([
+        AsyncClient(
+            base_url = f"https://api.telegram.org/bot{bot_token}",
+            transport = _http_transport
+        )
+        for bot_token in config.BOT_TOKENS
+    ])
 
 
 STAR_GIFTS_DATA = StarGiftsData.load()
@@ -297,7 +298,13 @@ async def main() -> None:
     )
 
     new_gifts_queue = NEW_GIFTS_QUEUE_T()
-    update_gifts_queue = UPDATE_GIFTS_QUEUE_T()
+
+    update_gifts_queue = (
+        UPDATE_GIFTS_QUEUE_T()
+        if BOTS_AMOUNT > 0
+        else
+        None
+    )
 
     asyncio.create_task(logger_wrapper(
         process_new_gifts(
@@ -306,11 +313,12 @@ async def main() -> None:
         )
     ))
 
-    asyncio.create_task(logger_wrapper(
-        process_update_gifts(
-            update_gifts_queue = update_gifts_queue
-        )
-    ))
+    if update_gifts_queue:
+        asyncio.create_task(logger_wrapper(
+            process_update_gifts(
+                update_gifts_queue = update_gifts_queue
+            )
+        ))
 
     await detector(
         app = app,
