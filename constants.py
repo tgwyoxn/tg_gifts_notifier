@@ -6,7 +6,7 @@ ENCODING = "utf-8"
 WORK_DIRPATH = Path(__file__).parent
 LOGS_DIRPATH = WORK_DIRPATH / "logs"
 
-LOG_FILEPATH = LOGS_DIRPATH / "bot.log"
+LOG_FILEPATH = LOGS_DIRPATH / "main.log"
 
 
 if not LOGS_DIRPATH.exists():

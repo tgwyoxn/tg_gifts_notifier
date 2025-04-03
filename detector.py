@@ -27,11 +27,7 @@ UPDATE_GIFTS_QUEUE_T = asyncio.Queue[tuple[StarGiftData, StarGiftData]]
 T = typing.TypeVar("T")
 
 
-if not config.BOT_TOKENS:
-    raise ValueError("BOT_TOKENS is empty")
-
 BOTS_AMOUNT = len(config.BOT_TOKENS)
-
 
 if BOTS_AMOUNT > 0:
     BOT_HTTP_CLIENT = AsyncClient(
@@ -53,7 +49,13 @@ logger = utils.get_logger(  # type: ignore
 )
 
 
-async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> dict[str, typing.Any]:
+@typing.overload
+async def bot_send_request(method: str, data: dict[str, typing.Any] | None) -> dict[str, typing.Any]: ...
+
+@typing.overload
+async def bot_send_request(method: typing.Literal["editMessageText"], data: dict[str, typing.Any]) -> dict[str, typing.Any] | None: ...
+
+async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> dict[str, typing.Any] | None:
     logger.debug(f"Sending request {method} with data: {data}")
 
     retries = BOTS_AMOUNT
@@ -79,6 +81,9 @@ async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None)
         if response.get("ok"):
             return response.get("result")
 
+        elif method == "editMessageText" and isinstance(response.get("description"), str) and "message is not modified" in response["description"]:
+            return
+
     raise RuntimeError(f"Failed to send request to Telegram API: {response}")
 
 
@@ -96,19 +101,11 @@ async def detector(
         if not app.is_connected:
             await app.start()
 
-        all_star_gifts_dict = {
-            star_gift_id: star_gift
-            for star_gift_id, star_gift in (await get_all_star_gifts(
-                client = app,
-                hash = None
-            ))[1].items()
-        }
-
-        old_star_gifts = STAR_GIFTS_DATA.star_gifts
+        _, all_star_gifts_dict = await get_all_star_gifts(app)
 
         old_star_gifts_dict = {
             star_gift.id: star_gift
-            for star_gift in old_star_gifts
+            for star_gift in STAR_GIFTS_DATA.star_gifts
         }
 
         new_star_gifts = {
@@ -118,7 +115,7 @@ async def detector(
         }
 
         if new_star_gifts and new_gift_callback:
-            logger.info(f"Found {len(new_star_gifts)} new gifts: [{', '.join(map(str, new_star_gifts.keys()))}]")
+            logger.info(f"""Found {len(new_star_gifts)} new gifts: [{", ".join(map(str, new_star_gifts.keys()))}]""")
 
             for star_gift_id, star_gift in new_star_gifts.items():
                 await new_gift_callback(star_gift)
@@ -233,7 +230,7 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
 
         for new_star_gift in new_star_gifts:
             if new_star_gift.message_id is None:
-                return
+                continue
 
             await bot_send_request(
                 "editMessageText",
@@ -244,6 +241,8 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
                     "parse_mode": "HTML"
                 }
             )
+
+            logger.debug(f"Updated {new_star_gift.id} with {new_star_gift.available_amount} available amount")
 
         await star_gifts_data_saver(new_star_gifts)
 
@@ -297,6 +296,8 @@ async def logger_wrapper(coro: typing.Awaitable[T]) -> T | None:
 
 
 async def main() -> None:
+    logger.info("Starting gifts detector...")
+
     app = Client(
         name = config.SESSION_NAME,
         api_id = config.API_ID,
@@ -316,6 +317,9 @@ async def main() -> None:
                 update_gifts_queue = update_gifts_queue
             )
         ))
+
+    else:
+        logger.info("No bots available, skipping update gifts processing")
 
     await detector(
         app = app,
