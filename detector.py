@@ -13,6 +13,7 @@ from parse_data import get_all_star_gifts
 from star_gifts_data import StarGiftData, StarGiftsData
 
 import utils
+import constants
 import config
 
 
@@ -24,6 +25,7 @@ NULL_STR = ""
 STAR_GIFT_RAW_T = dict[str, typing.Any]
 NEW_GIFTS_QUEUE_T = asyncio.Queue[StarGiftData]
 UPDATE_GIFTS_QUEUE_T = asyncio.Queue[tuple[StarGiftData, StarGiftData]]
+T = typing.TypeVar("T")
 
 
 if not config.BOT_TOKENS:
@@ -46,9 +48,16 @@ BOT_HTTP_CLIENTS = cycle([
 STAR_GIFTS_DATA = StarGiftsData.load()
 last_star_gifts_data_saved_time: int | None = None
 
+logger = utils.get_logger(
+    name = config.SESSION_NAME,
+    log_filepath = constants.LOG_FILEPATH,
+    console_log_level = config.CONSOLE_LOG_LEVEL,
+    file_log_level = config.FILE_LOG_LEVEL
+)
+
 
 async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> None:
-    print(f"Sending request {method} with data: {data}")
+    logger.debug(f"Sending request {method} with data: {data}")
 
     response = None
 
@@ -73,7 +82,7 @@ async def detector(
         raise ValueError("At least one of new_gifts_queue or update_gifts_queue must be provided")
 
     while True:
-        print(f"[{utils.get_current_datetime(timezone)}] Checking for new gifts / updates...")
+        logger.debug("Checking for new gifts / updates...")
 
         if not app.is_connected:
             await app.start()
@@ -100,6 +109,8 @@ async def detector(
         }
 
         if new_star_gifts and new_gifts_queue:
+            logger.info(f"Found {len(new_star_gifts)} new gifts: [{', '.join(map(str, new_star_gifts.keys()))}]")
+
             for star_gift_id, star_gift in new_star_gifts.items():
                 new_gifts_queue.put_nowait(star_gift)
 
@@ -267,7 +278,15 @@ async def star_gifts_data_saver(star_gifts: StarGiftData | list[StarGiftData]) -
 
             last_star_gifts_data_saved_time = utils.get_current_timestamp()
 
-            print("\t", f"[{utils.get_current_datetime(timezone)}] Saved star gifts to file")
+            logger.debug("Saved star gifts data file")
+
+
+async def logger_wrapper(coro: typing.Awaitable[T]) -> T | None:
+    try:
+        return await coro
+
+    except Exception as ex:
+        logger.exception(f"Error in {coro.__name__}: {ex}")  # type: ignore
 
 
 async def main() -> None:
@@ -280,18 +299,18 @@ async def main() -> None:
     new_gifts_queue = NEW_GIFTS_QUEUE_T()
     update_gifts_queue = UPDATE_GIFTS_QUEUE_T()
 
-    asyncio.create_task(
+    asyncio.create_task(logger_wrapper(
         process_new_gifts(
             app = app,
             new_gifts_queue = new_gifts_queue
         )
-    )
+    ))
 
-    asyncio.create_task(
+    asyncio.create_task(logger_wrapper(
         process_update_gifts(
             update_gifts_queue = update_gifts_queue
         )
-    )
+    ))
 
     await detector(
         app = app,

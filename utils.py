@@ -1,8 +1,45 @@
+from pathlib import Path
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from pytz.tzinfo import BaseTzInfo
 
+import logging
 import numpy as np
 import typing
+
+
+class StrippingFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        record.msg = record.msg.strip() if isinstance(record.msg, str) else record.msg
+
+        return super().format(record)
+
+def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> logging.LoggerAdapter[logging.Logger]:
+    logger = logging.getLogger(name)
+
+    logger.setLevel(min(console_log_level, file_log_level))
+
+    formatter = StrippingFormatter("%(asctime)s - %(star_gift_id)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s")
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_log_level)
+    console_handler.setFormatter(formatter)
+
+    file_handler = RotatingFileHandler(
+        filename = log_filepath.resolve().as_posix(),
+        mode = "a",
+        maxBytes = 1028 * 1024,  # 1 MB
+        backupCount = 1_000,
+        encoding = "utf-8"
+    )
+
+    file_handler.setLevel(file_log_level)
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    return logging.LoggerAdapter(logger, {"star_gift_id": "..."})
 
 
 def get_current_datetime(timezone: BaseTzInfo) -> str:

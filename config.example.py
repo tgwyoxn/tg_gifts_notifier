@@ -1,3 +1,5 @@
+import logging
+
 import constants
 
 
@@ -21,6 +23,8 @@ NOTIFY_CHAT_ID = -1002452764624  # https://t.me/gifts_detector
 NOTIFY_AFTER_STICKER_DELAY = 1.
 NOTIFY_AFTER_TEXT_DELAY = 2.
 TIMEZONE = "UTC"
+CONSOLE_LOG_LEVEL = logging.DEBUG
+FILE_LOG_LEVEL = logging.INFO
 
 
 NOTIFY_TEXT = """\
