@@ -22,6 +22,8 @@ NULL_STR = ""
 
 
 STAR_GIFT_RAW_T = dict[str, typing.Any]
+NEW_GIFTS_QUEUE_T = asyncio.Queue[StarGiftData]
+UPDATE_GIFTS_QUEUE_T = asyncio.Queue[tuple[StarGiftData, StarGiftData]]
 
 
 if not config.BOT_TOKENS:
@@ -30,15 +32,19 @@ if not config.BOT_TOKENS:
 BOTS_AMOUNT = len(config.BOT_TOKENS)
 
 
-http_transport = AsyncHTTPTransport()
+_http_transport = AsyncHTTPTransport()
 
 BOT_HTTP_CLIENTS = cycle([
     AsyncClient(
         base_url = f"https://api.telegram.org/bot{bot_token}",
-        transport = http_transport
+        transport = _http_transport
     )
     for bot_token in config.BOT_TOKENS
 ])
+
+
+STAR_GIFTS_DATA = StarGiftsData.load()
+last_star_gifts_data_saved_time: int | None = None
 
 
 async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> None:
@@ -60,27 +66,17 @@ async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None)
 
 async def detector(
     app: Client,
-    new_callback: typing.Callable[[Client, StarGiftData], typing.Awaitable[None]] | None = None,
-    update_callback: typing.Callable[[Client, StarGiftData, StarGiftData], typing.Awaitable[None]] | None = None,
-    connect_every_loop: bool = False
+    new_gifts_queue: NEW_GIFTS_QUEUE_T | None = None,
+    update_gifts_queue: UPDATE_GIFTS_QUEUE_T | None = None
 ) -> None:
-    if new_callback is None and update_callback is None:
-        raise ValueError("At least one of new_callback or update_callback must be provided")
-
-    star_gifts_data = StarGiftsData.load()
+    if new_gifts_queue is None and update_gifts_queue is None:
+        raise ValueError("At least one of new_gifts_queue or update_gifts_queue must be provided")
 
     while True:
         print(f"[{utils.get_current_datetime(timezone)}] Checking for new gifts / updates...")
 
         if not app.is_connected:
             await app.start()
-
-        old_star_gifts = star_gifts_data.star_gifts
-
-        old_star_gifts_dict = {
-            star_gift.id: star_gift
-            for star_gift in old_star_gifts
-        }
 
         all_star_gifts_dict = {
             star_gift_id: star_gift
@@ -90,7 +86,12 @@ async def detector(
             ))[1].items()
         }
 
-        all_star_gifts = list(all_star_gifts_dict.values())
+        old_star_gifts = STAR_GIFTS_DATA.star_gifts
+
+        old_star_gifts_dict = {
+            star_gift.id: star_gift
+            for star_gift in old_star_gifts
+        }
 
         new_star_gifts = {
             star_gift_id: star_gift
@@ -98,28 +99,17 @@ async def detector(
             if star_gift_id not in old_star_gifts_dict
         }
 
-        if new_star_gifts and new_callback:
-            print("New star gifts found:", len(new_star_gifts))
-
+        if new_star_gifts and new_gifts_queue:
             for star_gift_id, star_gift in new_star_gifts.items():
-                await new_callback(app, star_gift)
+                new_gifts_queue.put_nowait(star_gift)
 
-                if not star_gift.message_id:
-                    raise RuntimeError(f"No \"message_id\" specified for new gift with ID {star_gift_id}")
-
-        if update_callback:
+        if update_gifts_queue:
             for star_gift_id, old_star_gift in old_star_gifts_dict.items():
                 new_star_gift = all_star_gifts_dict[star_gift_id]
                 new_star_gift.message_id = old_star_gift.message_id
 
                 if new_star_gift.available_amount < old_star_gift.available_amount:
-                    await update_callback(app, old_star_gift, new_star_gift)
-
-        star_gifts_data.star_gifts = all_star_gifts
-        star_gifts_data.save()
-
-        if connect_every_loop:
-            await app.stop()
+                    update_gifts_queue.put_nowait((old_star_gift, new_star_gift))
 
         await asyncio.sleep(config.CHECK_INTERVAL)
 
@@ -173,45 +163,111 @@ def get_notify_text(star_gift: StarGiftData) -> str:
     )
 
 
-async def new_callback(app: Client, star_gift: StarGiftData) -> None:
-    binary: BytesIO = await app.download_media(  # type: ignore
-        message = star_gift.sticker_file_id,
-        in_memory = True
-    )
+async def process_new_gifts(app: Client, new_gifts_queue: NEW_GIFTS_QUEUE_T) -> None:
+    while True:
+        star_gift = await new_gifts_queue.get()
 
-    binary.name = star_gift.sticker_file_name
+        binary: BytesIO = await app.download_media(  # type: ignore
+            message = star_gift.sticker_file_id,
+            in_memory = True
+        )
 
-    sticker_message: types.Message = await app.send_sticker(  # type: ignore
-        chat_id = config.NOTIFY_CHAT_ID,
-        sticker = binary
-    )
+        binary.name = star_gift.sticker_file_name
 
-    await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
+        sticker_message: types.Message = await app.send_sticker(  # type: ignore
+            chat_id = config.NOTIFY_CHAT_ID,
+            sticker = binary
+        )
 
-    message = await app.send_message(
-        chat_id = config.NOTIFY_CHAT_ID,
-        text = get_notify_text(star_gift),
-        reply_to_message_id = sticker_message.id
-    )
+        await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
 
-    star_gift.message_id = message.id
+        message = await app.send_message(
+            chat_id = config.NOTIFY_CHAT_ID,
+            text = get_notify_text(star_gift),
+            reply_to_message_id = sticker_message.id
+        )
 
-    await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
+        star_gift.message_id = message.id
+
+        await star_gifts_data_saver(star_gift)
+
+        new_gifts_queue.task_done()
+
+        await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
 
-async def update_callback(app: Client, old_star_gift: StarGiftData, new_star_gift: StarGiftData) -> None:
-    if new_star_gift.message_id is None:
-        return
+async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None:
+    while True:
+        new_star_gifts: list[StarGiftData] = []
 
-    await bot_send_request(
-        "editMessageText",
-        {
-            "chat_id": config.NOTIFY_CHAT_ID,
-            "message_id": new_star_gift.message_id,
-            "text": get_notify_text(new_star_gift),
-            "parse_mode": "HTML"
-        }
-    )
+        while True:
+            try:
+                _, new_star_gift = update_gifts_queue.get_nowait()
+                new_star_gifts.append(new_star_gift)
+
+            except asyncio.QueueEmpty:
+                break
+
+        if not new_star_gifts:
+            await asyncio.sleep(0.1)
+
+            continue
+
+        for new_star_gift in new_star_gifts:
+            if new_star_gift.message_id is None:
+                return
+
+            await bot_send_request(
+                "editMessageText",
+                {
+                    "chat_id": config.NOTIFY_CHAT_ID,
+                    "message_id": new_star_gift.message_id,
+                    "text": get_notify_text(new_star_gift),
+                    "parse_mode": "HTML"
+                }
+            )
+
+        await star_gifts_data_saver(new_star_gifts)
+
+        update_gifts_queue.task_done()
+
+
+star_gifts_data_saver_lock = asyncio.Lock()
+
+async def star_gifts_data_saver(star_gifts: StarGiftData | list[StarGiftData]) -> None:
+    global STAR_GIFTS_DATA, last_star_gifts_data_saved_time
+
+    async with star_gifts_data_saver_lock:
+        if not isinstance(star_gifts, list):
+            star_gifts = [star_gifts]
+
+        for star_gift in star_gifts:
+            found = False
+
+            for i, old_star_gift in enumerate(STAR_GIFTS_DATA.star_gifts):
+                if old_star_gift.id == star_gift.id:
+                    STAR_GIFTS_DATA.star_gifts[i] = star_gift
+                    found = True
+
+                    break
+
+            if not found:
+                for i, old_star_gift in enumerate(STAR_GIFTS_DATA.star_gifts):
+                    if star_gift.id < old_star_gift.id:
+                        STAR_GIFTS_DATA.star_gifts.insert(i, star_gift)
+                        found = True
+
+                        break
+
+            if not found:
+                STAR_GIFTS_DATA.star_gifts.append(star_gift)
+
+        if last_star_gifts_data_saved_time is None or last_star_gifts_data_saved_time + config.DATA_SAVER_DELAY < utils.get_current_timestamp():
+            STAR_GIFTS_DATA.save()
+
+            last_star_gifts_data_saved_time = utils.get_current_timestamp()
+
+            print("\t", f"[{utils.get_current_datetime(timezone)}] Saved star gifts to file")
 
 
 async def main() -> None:
@@ -221,15 +277,32 @@ async def main() -> None:
         api_hash = config.API_HASH
     )
 
+    new_gifts_queue = NEW_GIFTS_QUEUE_T()
+    update_gifts_queue = UPDATE_GIFTS_QUEUE_T()
+
+    asyncio.create_task(
+        process_new_gifts(
+            app = app,
+            new_gifts_queue = new_gifts_queue
+        )
+    )
+
+    asyncio.create_task(
+        process_update_gifts(
+            update_gifts_queue = update_gifts_queue
+        )
+    )
+
     await detector(
         app = app,
-        new_callback = new_callback,
-        update_callback = update_callback
+        new_gifts_queue = new_gifts_queue,
+        update_gifts_queue = update_gifts_queue
     )
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+
     except KeyboardInterrupt:
-        pass
+        STAR_GIFTS_DATA.save()

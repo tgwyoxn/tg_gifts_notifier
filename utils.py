@@ -8,6 +8,9 @@ import typing
 def get_current_datetime(timezone: BaseTzInfo) -> str:
     return datetime.now(tz=timezone).strftime("%d-%m-%Y %H:%M:%S")
 
+def get_current_timestamp() -> int:
+    return int(datetime.now().timestamp())
+
 
 def pretty_int(number: int) -> str:
     return "{:,}".format(number)
