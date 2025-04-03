@@ -1,9 +1,9 @@
 from pyrogram import Client, types
-from httpx import AsyncClient
-from httpx._transports.default import AsyncHTTPTransport
+from httpx import AsyncClient, TimeoutException
 from pytz import timezone as _timezone
 from io import BytesIO
 from itertools import cycle
+from functools import partial
 
 import math
 import asyncio
@@ -23,7 +23,6 @@ NULL_STR = ""
 
 
 STAR_GIFT_RAW_T = dict[str, typing.Any]
-NEW_GIFTS_QUEUE_T = asyncio.Queue[StarGiftData]
 UPDATE_GIFTS_QUEUE_T = asyncio.Queue[tuple[StarGiftData, StarGiftData]]
 T = typing.TypeVar("T")
 
@@ -35,21 +34,18 @@ BOTS_AMOUNT = len(config.BOT_TOKENS)
 
 
 if BOTS_AMOUNT > 0:
-    _http_transport = AsyncHTTPTransport()
+    BOT_HTTP_CLIENT = AsyncClient(
+        base_url = "https://api.telegram.org/",
+        timeout = config.HTTP_REQUEST_TIMEOUT
+    )
 
-    BOT_HTTP_CLIENTS = cycle([
-        AsyncClient(
-            base_url = f"https://api.telegram.org/bot{bot_token}",
-            transport = _http_transport
-        )
-        for bot_token in config.BOT_TOKENS
-    ])
+    BOT_TOKENS_CYCLE = cycle(config.BOT_TOKENS)
 
 
 STAR_GIFTS_DATA = StarGiftsData.load()
 last_star_gifts_data_saved_time: int | None = None
 
-logger = utils.get_logger(
+logger = utils.get_logger(  # type: ignore
     name = config.SESSION_NAME,
     log_filepath = constants.LOG_FILEPATH,
     console_log_level = config.CONSOLE_LOG_LEVEL,
@@ -57,30 +53,42 @@ logger = utils.get_logger(
 )
 
 
-async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> None:
+async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> dict[str, typing.Any]:
     logger.debug(f"Sending request {method} with data: {data}")
 
+    retries = BOTS_AMOUNT
     response = None
 
-    for _ in range(BOTS_AMOUNT):
-        response = (await next(BOT_HTTP_CLIENTS).post(
-            method,
-            json = data
-        )).json()
+    for bot_token in BOT_TOKENS_CYCLE:
+        retries -= 1
+
+        if retries < 0:
+            break
+
+        try:
+            response = (await BOT_HTTP_CLIENT.post(
+                f"/bot{bot_token}/{method}",
+                json = data
+            )).json()
+
+        except TimeoutException:
+            logger.warning(f"Timeout exception while sending request {method} with data: {data}")
+
+            continue
 
         if response.get("ok"):
-            return
+            return response.get("result")
 
     raise RuntimeError(f"Failed to send request to Telegram API: {response}")
 
 
 async def detector(
     app: Client,
-    new_gifts_queue: NEW_GIFTS_QUEUE_T | None = None,
+    new_gift_callback: typing.Callable[[StarGiftData], typing.Coroutine[None, None, typing.Any]] | None = None,
     update_gifts_queue: UPDATE_GIFTS_QUEUE_T | None = None
 ) -> None:
-    if new_gifts_queue is None and update_gifts_queue is None:
-        raise ValueError("At least one of new_gifts_queue or update_gifts_queue must be provided")
+    if new_gift_callback is None and update_gifts_queue is None:
+        raise ValueError("At least one of new_gift_callback or update_gifts_queue must be provided")
 
     while True:
         logger.debug("Checking for new gifts / updates...")
@@ -109,11 +117,11 @@ async def detector(
             if star_gift_id not in old_star_gifts_dict
         }
 
-        if new_star_gifts and new_gifts_queue:
+        if new_star_gifts and new_gift_callback:
             logger.info(f"Found {len(new_star_gifts)} new gifts: [{', '.join(map(str, new_star_gifts.keys()))}]")
 
             for star_gift_id, star_gift in new_star_gifts.items():
-                new_gifts_queue.put_nowait(star_gift)
+                await new_gift_callback(star_gift)
 
         if update_gifts_queue:
             for star_gift_id, old_star_gift in old_star_gifts_dict.items():
@@ -122,6 +130,9 @@ async def detector(
 
                 if new_star_gift.available_amount < old_star_gift.available_amount:
                     update_gifts_queue.put_nowait((old_star_gift, new_star_gift))
+
+        if new_star_gifts:
+            await star_gifts_data_saver(list(new_star_gifts.values()))
 
         await asyncio.sleep(config.CHECK_INTERVAL)
 
@@ -175,37 +186,32 @@ def get_notify_text(star_gift: StarGiftData) -> str:
     )
 
 
-async def process_new_gifts(app: Client, new_gifts_queue: NEW_GIFTS_QUEUE_T) -> None:
-    while True:
-        star_gift = await new_gifts_queue.get()
+async def process_new_gift(app: Client, star_gift: StarGiftData) -> None:
+    binary: BytesIO = await app.download_media(  # type: ignore
+        message = star_gift.sticker_file_id,
+        in_memory = True
+    )
 
-        binary: BytesIO = await app.download_media(  # type: ignore
-            message = star_gift.sticker_file_id,
-            in_memory = True
-        )
+    binary.name = star_gift.sticker_file_name
 
-        binary.name = star_gift.sticker_file_name
+    sticker_message: types.Message = await app.send_sticker(  # type: ignore
+        chat_id = config.NOTIFY_CHAT_ID,
+        sticker = binary
+    )
 
-        sticker_message: types.Message = await app.send_sticker(  # type: ignore
-            chat_id = config.NOTIFY_CHAT_ID,
-            sticker = binary
-        )
+    await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
 
-        await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
+    response = await bot_send_request(
+        "sendMessage",
+        {
+            "chat_id": config.NOTIFY_CHAT_ID,
+            "text": get_notify_text(star_gift),
+            "reply_to_message_id": sticker_message.id,
+            "parse_mode": "HTML"
+        }
+    )
 
-        message = await app.send_message(
-            chat_id = config.NOTIFY_CHAT_ID,
-            text = get_notify_text(star_gift),
-            reply_to_message_id = sticker_message.id
-        )
-
-        star_gift.message_id = message.id
-
-        await star_gifts_data_saver(star_gift)
-
-        new_gifts_queue.task_done()
-
-        await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
+    star_gift.message_id = response["message_id"]
 
 
 async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None:
@@ -297,21 +303,12 @@ async def main() -> None:
         api_hash = config.API_HASH
     )
 
-    new_gifts_queue = NEW_GIFTS_QUEUE_T()
-
     update_gifts_queue = (
         UPDATE_GIFTS_QUEUE_T()
         if BOTS_AMOUNT > 0
         else
         None
     )
-
-    asyncio.create_task(logger_wrapper(
-        process_new_gifts(
-            app = app,
-            new_gifts_queue = new_gifts_queue
-        )
-    ))
 
     if update_gifts_queue:
         asyncio.create_task(logger_wrapper(
@@ -322,7 +319,7 @@ async def main() -> None:
 
     await detector(
         app = app,
-        new_gifts_queue = new_gifts_queue,
+        new_gift_callback = partial(process_new_gift, app),
         update_gifts_queue = update_gifts_queue
     )
 
