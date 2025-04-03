@@ -1,22 +1,28 @@
-from pathlib import Path
+import constants
 
 
-SESSION_NAME: str = "account"
+SESSION_NAME = "account"
 
-API_ID: int = 1234
-API_HASH: str = "1234"
+API_ID = 1234
+API_HASH = "1234"
 
-
-CHECK_INTERVAL: float = 90.
-
-DATA_FILEPATH: Path = Path(__file__).parent / "star_gifts.json"
-NOTIFY_CHAT_ID: int = -1002452764624  # https://t.me/gifts_detector
-NOTIFY_AFTER_STICKER_DELAY: float = 1.
-NOTIFY_AFTER_TEXT_DELAY: float = 2.
-TIMEZONE: str = "UTC"
+BOT_TOKENS = [
+    "1234:abcd",
+    "2345:bcda",
+    "3456:cdef",
+]
 
 
-NOTIFY_TEXT: str = """\
+CHECK_INTERVAL = 90.
+
+DATA_FILEPATH = constants.WORK_DIRPATH / "star_gifts.json"
+NOTIFY_CHAT_ID = -1002452764624  # https://t.me/gifts_detector
+NOTIFY_AFTER_STICKER_DELAY = 1.
+NOTIFY_AFTER_TEXT_DELAY = 2.
+TIMEZONE = "UTC"
+
+
+NOTIFY_TEXT = """\
 {title}
 
 № {number} (<code>{id}</code>)
@@ -25,18 +31,10 @@ NOTIFY_TEXT: str = """\
 ♻️ Convert price: {convert_price} ⭐️
 """
 
-NOTIFY_TEXT_TITLES: dict[bool, str] = {
+NOTIFY_TEXT_TITLES = {
     True: "🔥 A new limited gift has appeared",
     False: "❄️ A new gift has appeared"
 }
 
 NOTIFY_TEXT_TOTAL_AMOUNT: str = "\n🎯 Total amount: {total_amount}"
 NOTIFY_TEXT_AVAILABLE_AMOUNT: str = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%, updated at {updated_datetime} UTC)\n"
-
-
-GIFT_CHAT_IDS: list[int] = [
-    794823214,  # https://t.me/arynme
-]
-
-GIFT_TEXT: str = "🎁 Gift №{number} ({id})"
-GIFT_HIDE_MY_NAME: bool = True

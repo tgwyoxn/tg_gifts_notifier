@@ -1,12 +1,16 @@
 from pyrogram import Client, types
-from pyrogram.errors import exceptions
-from io import BytesIO
+from httpx import AsyncClient
+from httpx._transports.default import AsyncHTTPTransport
 from pytz import timezone as _timezone
+from io import BytesIO
+from itertools import cycle
 
-import json
 import math
 import asyncio
 import typing
+
+from parse_data import get_all_star_gifts
+from star_gifts_data import StarGiftData, StarGiftsData
 
 import utils
 import config
@@ -14,94 +18,105 @@ import config
 
 timezone = _timezone(config.TIMEZONE)
 
-null_str: str = ""
+NULL_STR = ""
 
 
-async def detector(app: Client, new_callback: typing.Callable, update_callback: typing.Callable, connect_every_loop: bool=True) -> None:
+STAR_GIFT_RAW_T = dict[str, typing.Any]
+
+
+if not config.BOT_TOKENS:
+    raise ValueError("BOT_TOKENS is empty")
+
+BOTS_AMOUNT = len(config.BOT_TOKENS)
+
+
+http_transport = AsyncHTTPTransport()
+
+BOT_HTTP_CLIENTS = cycle([
+    AsyncClient(
+        base_url = f"https://api.telegram.org/bot{bot_token}",
+        transport = http_transport
+    )
+    for bot_token in config.BOT_TOKENS
+])
+
+
+async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> None:
+    print(f"Sending request {method} with data: {data}")
+
+    response = None
+
+    for _ in range(BOTS_AMOUNT):
+        response = (await next(BOT_HTTP_CLIENTS).post(
+            method,
+            json = data
+        )).json()
+
+        if response.get("ok"):
+            return
+
+    raise RuntimeError(f"Failed to send request to Telegram API: {response}")
+
+
+async def detector(
+    app: Client,
+    new_callback: typing.Callable[[Client, StarGiftData], typing.Awaitable[None]] | None = None,
+    update_callback: typing.Callable[[Client, StarGiftData, StarGiftData], typing.Awaitable[None]] | None = None,
+    connect_every_loop: bool = True
+) -> None:
+    if new_callback is None and update_callback is None:
+        raise ValueError("At least one of new_callback or update_callback must be provided")
+
+    star_gifts_data = StarGiftsData.load()
+
     while True:
-        print("Checking...")
+        print(f"[{utils.get_current_datetime(timezone)}] Checking for new gifts / updates...")
 
         if not app.is_connected:
             await app.start()
 
-        old_star_gifts_raw: list[dict]
+        old_star_gifts = star_gifts_data.star_gifts
 
-        try:
-            with config.DATA_FILEPATH.open("r") as file:
-                old_star_gifts_raw = json.load(file)
-
-        except FileNotFoundError:
-            old_star_gifts_raw = []
-
-        old_star_gifts_raw_dict: dict[int, dict] = {
-            star_gift_raw["id"]: star_gift_raw
-            for star_gift_raw in old_star_gifts_raw
+        old_star_gifts_dict = {
+            star_gift.id: star_gift
+            for star_gift in old_star_gifts
         }
 
-        all_star_gifts_raw: list[dict] = [
-            json.loads(json.dumps(
-                star_gift,
-                indent = 4,
-                default = types.Object.default,
-                ensure_ascii = False
-            ))
-            for star_gift in await app.get_star_gifts()
-        ]
-
-        all_star_gifts_raw_dict: dict[int, dict] = {
-            star_gifts_raw["id"]: star_gifts_raw
-            for star_gifts_raw in all_star_gifts_raw
+        all_star_gifts_dict = {
+            star_gift_id: star_gift
+            for star_gift_id, star_gift in (await get_all_star_gifts(
+                client = app,
+                hash = None
+            ))[1].items()
         }
 
-        new_star_gifts_raw: dict[int, dict] = {
-            key: value
-            for key, value in all_star_gifts_raw_dict.items()
-            if key not in old_star_gifts_raw_dict
+        all_star_gifts = list(all_star_gifts_dict.values())
+
+        new_star_gifts = {
+            star_gift_id: star_gift
+            for star_gift_id, star_gift in all_star_gifts_dict.items()
+            if star_gift_id not in old_star_gifts_dict
         }
 
-        all_star_gifts_ids: list[int] = list(all_star_gifts_raw_dict.keys())
-        all_star_gifts_amount: int = len(all_star_gifts_ids)
+        if new_star_gifts and new_callback:
+            print("New star gifts found:", len(new_star_gifts))
 
-        if new_star_gifts_raw:
-            print("New star gifts found:", len(new_star_gifts_raw))
+            for star_gift_id, star_gift in new_star_gifts.items():
+                await new_callback(app, star_gift)
 
-            for star_gift_id, star_gift_raw in new_star_gifts_raw.items():
-                star_gift_raw["number"] = all_star_gifts_amount - all_star_gifts_ids.index(star_gift_id)
-
-            for star_gift_id, star_gift_raw in sorted(
-                new_star_gifts_raw.items(),
-                key = lambda it: it[1]["number"]
-            ):
-                await new_callback(
-                    app,
-                    star_gift_raw
-                )
+                if not star_gift.message_id:
+                    raise RuntimeError(f"No \"message_id\" specified for new gift with ID {star_gift_id}")
 
         if update_callback:
-            for star_gift_id, old_star_gift_raw in old_star_gifts_raw_dict.items():
-                new_star_gift_raw: dict = all_star_gifts_raw_dict[star_gift_id]
-                old_available_amount: int = old_star_gift_raw.get("available_amount", -1)
+            for star_gift_id, old_star_gift in old_star_gifts_dict.items():
+                new_star_gift = all_star_gifts_dict[star_gift_id]
+                new_star_gift.message_id = old_star_gift.message_id
 
-                if "message_id" in old_star_gift_raw:
-                    new_star_gift_raw["message_id"] = old_star_gift_raw["message_id"]
+                if new_star_gift.available_amount < old_star_gift.available_amount:
+                    await update_callback(app, old_star_gift, new_star_gift)
 
-                new_star_gift_raw["number"] = all_star_gifts_amount - all_star_gifts_ids.index(star_gift_id)
-
-                if old_available_amount > -1 and new_star_gift_raw["available_amount"] < old_available_amount:
-                    await update_callback(
-                        app,
-                        old_star_gift_raw,
-                        new_star_gift_raw
-                    )
-
-        with config.DATA_FILEPATH.open("w") as file:
-            json.dump(
-                obj = all_star_gifts_raw,
-                fp = file,
-                indent = 4,
-                default = types.Object.default,
-                ensure_ascii = False
-            )
+        star_gifts_data.star_gifts = all_star_gifts
+        star_gifts_data.save()
 
         if connect_every_loop:
             await app.stop()
@@ -109,32 +124,39 @@ async def detector(app: Client, new_callback: typing.Callable, update_callback: 
         await asyncio.sleep(config.CHECK_INTERVAL)
 
 
-def get_notify_text(star_gift_raw: dict) -> str:
-    is_limited: bool = star_gift_raw["is_limited"]
+def get_notify_text(star_gift: StarGiftData) -> str:
+    is_limited = star_gift.is_limited
 
-    if is_limited:
-        available_percentage, available_percentage_is_same = utils.pretty_float(
-            number = math.ceil(star_gift_raw["available_amount"] / star_gift_raw["total_amount"] * 100 * 100) / 100,
+    available_percentage, available_percentage_is_same = (
+        utils.pretty_float(
+            math.ceil(star_gift.available_amount / star_gift.total_amount * 100 * 100) / 100,
             get_is_same = True
         )
+        if is_limited
+        else
+        (
+            NULL_STR,
+            False
+        )
+    )
 
     return config.NOTIFY_TEXT.format(
         title = config.NOTIFY_TEXT_TITLES[is_limited],
-        number = star_gift_raw.pop("number"),
-        id = star_gift_raw["id"],
+        number = star_gift.number,
+        id = star_gift.id,
         total_amount = (
             config.NOTIFY_TEXT_TOTAL_AMOUNT.format(
-                total_amount = utils.pretty_int(star_gift_raw["total_amount"])
+                total_amount = utils.pretty_int(star_gift.total_amount)
             )
             if is_limited
             else
-            null_str
+            NULL_STR
         ),
         available_amount = (
             config.NOTIFY_TEXT_AVAILABLE_AMOUNT.format(
-                available_amount = utils.pretty_int(star_gift_raw["available_amount"]),
+                available_amount = utils.pretty_int(star_gift.available_amount),
                 same_str = (
-                    null_str
+                    NULL_STR
                     if available_percentage_is_same
                     else
                     "~"
@@ -144,61 +166,84 @@ def get_notify_text(star_gift_raw: dict) -> str:
             )
             if is_limited
             else
-            null_str
+            NULL_STR
         ),
-        price = utils.pretty_int(star_gift_raw["price"]),
-        convert_price = utils.pretty_int(star_gift_raw["convert_price"])
+        price = utils.pretty_int(star_gift.price),
+        convert_price = utils.pretty_int(star_gift.convert_price)
     )
 
 
-async def new_callback(app: Client, star_gift_raw: dict) -> None:
-    binary: BytesIO = await app.download_media(
-        message = star_gift_raw["sticker"]["file_id"],
+async def new_callback(app: Client, star_gift: StarGiftData) -> None:
+    binary: BytesIO = await app.download_media(  # type: ignore
+        message = star_gift.sticker_file_id,
         in_memory = True
     )
 
-    binary.name = "{}.{}".format(
-        star_gift_raw["id"],
-        star_gift_raw["sticker"]["file_name"].split(".")[-1]
-    )
+    binary.name = star_gift.sticker_file_name
 
-    sticker_message: types.Message = await app.send_sticker(
+    sticker_message: types.Message = await app.send_sticker(  # type: ignore
         chat_id = config.NOTIFY_CHAT_ID,
         sticker = binary
     )
 
     await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
 
-    message: types.Message = await app.send_message(
+    message = await app.send_message(
         chat_id = config.NOTIFY_CHAT_ID,
-        text = get_notify_text(star_gift_raw),
+        text = get_notify_text(star_gift),
         reply_to_message_id = sticker_message.id
     )
 
-    star_gift_raw["message_id"] = message.id
+    star_gift.message_id = message.id
 
     await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
 
-async def update_callback(app: Client, old_star_gift_raw: dict, new_star_gift_raw: dict) -> None:
-    if "message_id" not in new_star_gift_raw:
+async def update_callback(app: Client, old_star_gift: StarGiftData, new_star_gift: StarGiftData) -> None:
+    if new_star_gift.message_id is None:
         return
 
-    try:
-        await app.edit_message_text(
-            chat_id = config.NOTIFY_CHAT_ID,
-            text = get_notify_text(new_star_gift_raw),
-            message_id = new_star_gift_raw["message_id"]
-        )
+    # await app.edit_message_text(
+    #     chat_id = config.NOTIFY_CHAT_ID,
+    #     text = get_notify_text(new_star_gift),
+    #     message_id = new_star_gift.message_id
+    # )
+    # for _ in range(BOTS_AMOUNT):
+    #     response = (await next(BOT_HTTP_CLIENTS).post(
+    #         "sendMessage",
+    #         json = {
+    #             "chat_id": config.NOTIFY_CHAT_ID,
+    #             "text": get_notify_text(new_star_gift),
+    #             "parse_mode": "HTML",
+    #             "reply_parameters": {
+    #                 "message_id": new_star_gift.message_id,
+    #                 "allow_sending_without_reply": False
+    #             }
+    #         }
+    #     )).json()
 
-    except exceptions.MessageNotModified:
-        pass
+    #     if response.get("ok"):
+    #         break
 
-    await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
+    await bot_send_request(
+        "editMessageText",
+        {
+            "chat_id": config.NOTIFY_CHAT_ID,
+            "message_id": new_star_gift.message_id,
+            "text": get_notify_text(new_star_gift),
+            "parse_mode": "HTML",
+            # "reply_parameters": {
+            #     "message_id": new_star_gift.message_id,
+            #     "allow_sending_without_reply": False
+            # }
+        }
+    )
+
+    # await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
 
 async def main() -> None:
-    app: Client = Client(
+    app = Client(
         name = config.SESSION_NAME,
         api_id = config.API_ID,
         api_hash = config.API_HASH
@@ -207,9 +252,13 @@ async def main() -> None:
     await detector(
         app = app,
         new_callback = new_callback,
-        update_callback = update_callback
+        update_callback = update_callback,
+        connect_every_loop = False
     )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

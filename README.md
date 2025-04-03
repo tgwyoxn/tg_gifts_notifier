@@ -52,11 +52,19 @@ python auto_buyer.py
 
 At first rename `config.example.py` to `config.py`.
 
-Then, you must configure the notifier by editing the `config.example.py` file.
+Then, you must configure the notifier by editing the `config.py` file.
 
-### Note
-
-Currently it is not available to send star gift with text. Seems like problem in [pyrofork](https://github.com/Mayuri-Chan/pyrofork).
+| Field                      | Type      | Description                                                         |
+|-------------------|---------|---------------------------------------------------------------------|
+| API_ID                     | Integer   | Your Telegram API ID obtained from my.telegram.org                  |
+| API_HASH                   | String    | Your Telegram API Hash corresponding to your API ID                 |
+| BOT_TOKENS                 | [String]  | Bot tokens provided by [BotFather](https://t.me/BotFather) of your Telegram bot            |
+| CHECK_INTERVAL             | Float     | Time interval (in seconds) between checks for new gifts             |
+| DATA_FILEPATH              | String    | Path to the file where the gift data is stored                      |
+| NOTIFY_CHAT_ID             | Integer   | Chat ID where notifications are delivered                           |
+| NOTIFY_AFTER_STICKER_DELAY | Float     | Delay (in seconds) after sending a sticker before sending a message |
+| NOTIFY_AFTER_TEXT_DELAY    | Float     | Delay (in seconds) after sending a message |
+| TIMEZONE                   | String    | Timezone for the bot (e.g., "Europe/Moscow")                        |
 
 ## Contact
 
@@ -66,6 +74,6 @@ For any questions or feedback, please contact me at [my socials](https://aryn.se
 
 If you find TG Gifts Notifier useful and would like to support its development, consider making a donation. Your contributions help in maintaining and improving the project.
 
-You can donate via the following methods: [@adonates_mv](https://t.me/adonates_mv/2)
+You can donate via the following methods listed on this [site](https://aryn.sek.su/donates).
 
 Thank you for your support!

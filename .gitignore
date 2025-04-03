@@ -6,5 +6,7 @@
 *.json
 *.session*
 *.service
-config.py
+config*.py
+
 !requirements.txt
+!config.example.py
