@@ -62,7 +62,7 @@ async def detector(
     app: Client,
     new_callback: typing.Callable[[Client, StarGiftData], typing.Awaitable[None]] | None = None,
     update_callback: typing.Callable[[Client, StarGiftData, StarGiftData], typing.Awaitable[None]] | None = None,
-    connect_every_loop: bool = True
+    connect_every_loop: bool = False
 ) -> None:
     if new_callback is None and update_callback is None:
         raise ValueError("At least one of new_callback or update_callback must be provided")
@@ -203,43 +203,15 @@ async def update_callback(app: Client, old_star_gift: StarGiftData, new_star_gif
     if new_star_gift.message_id is None:
         return
 
-    # await app.edit_message_text(
-    #     chat_id = config.NOTIFY_CHAT_ID,
-    #     text = get_notify_text(new_star_gift),
-    #     message_id = new_star_gift.message_id
-    # )
-    # for _ in range(BOTS_AMOUNT):
-    #     response = (await next(BOT_HTTP_CLIENTS).post(
-    #         "sendMessage",
-    #         json = {
-    #             "chat_id": config.NOTIFY_CHAT_ID,
-    #             "text": get_notify_text(new_star_gift),
-    #             "parse_mode": "HTML",
-    #             "reply_parameters": {
-    #                 "message_id": new_star_gift.message_id,
-    #                 "allow_sending_without_reply": False
-    #             }
-    #         }
-    #     )).json()
-
-    #     if response.get("ok"):
-    #         break
-
     await bot_send_request(
         "editMessageText",
         {
             "chat_id": config.NOTIFY_CHAT_ID,
             "message_id": new_star_gift.message_id,
             "text": get_notify_text(new_star_gift),
-            "parse_mode": "HTML",
-            # "reply_parameters": {
-            #     "message_id": new_star_gift.message_id,
-            #     "allow_sending_without_reply": False
-            # }
+            "parse_mode": "HTML"
         }
     )
-
-    # await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
 
 async def main() -> None:
@@ -252,8 +224,7 @@ async def main() -> None:
     await detector(
         app = app,
         new_callback = new_callback,
-        update_callback = update_callback,
-        connect_every_loop = False
+        update_callback = update_callback
     )
 
 
