@@ -3,6 +3,7 @@ from httpx import AsyncClient, TimeoutException
 from pytz import timezone as _timezone
 from io import BytesIO
 from itertools import cycle
+from bisect import bisect_left
 from functools import partial
 
 import math
@@ -219,6 +220,7 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
             try:
                 _, new_star_gift = update_gifts_queue.get_nowait()
                 new_star_gifts.append(new_star_gift)
+                update_gifts_queue.task_done()
 
             except asyncio.QueueEmpty:
                 break
@@ -246,8 +248,6 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
 
         await star_gifts_data_saver(new_star_gifts)
 
-        update_gifts_queue.task_done()
-
 
 star_gifts_data_saver_lock = asyncio.Lock()
 
@@ -258,26 +258,20 @@ async def star_gifts_data_saver(star_gifts: StarGiftData | list[StarGiftData]) -
         if not isinstance(star_gifts, list):
             star_gifts = [star_gifts]
 
+        current_star_gift_ids = [
+            gift.id
+            for gift in STAR_GIFTS_DATA.star_gifts
+        ]
+
         for star_gift in star_gifts:
-            found = False
+            pos = bisect_left(current_star_gift_ids, star_gift.id)
 
-            for i, old_star_gift in enumerate(STAR_GIFTS_DATA.star_gifts):
-                if old_star_gift.id == star_gift.id:
-                    STAR_GIFTS_DATA.star_gifts[i] = star_gift
-                    found = True
+            if pos < len(current_star_gift_ids) and current_star_gift_ids[pos] == star_gift.id:
+                STAR_GIFTS_DATA.star_gifts[pos] = star_gift
 
-                    break
-
-            if not found:
-                for i, old_star_gift in enumerate(STAR_GIFTS_DATA.star_gifts):
-                    if star_gift.id < old_star_gift.id:
-                        STAR_GIFTS_DATA.star_gifts.insert(i, star_gift)
-                        found = True
-
-                        break
-
-            if not found:
-                STAR_GIFTS_DATA.star_gifts.append(star_gift)
+            else:
+                STAR_GIFTS_DATA.star_gifts.insert(pos, star_gift)
+                current_star_gift_ids.insert(pos, star_gift.id)
 
         if last_star_gifts_data_saved_time is None or last_star_gifts_data_saved_time + config.DATA_SAVER_DELAY < utils.get_current_timestamp():
             STAR_GIFTS_DATA.save()
