@@ -15,7 +15,7 @@ BOT_TOKENS = [
 ]
 
 
-CHECK_INTERVAL = 90.
+CHECK_INTERVAL = 1.
 
 DATA_FILEPATH = constants.WORK_DIRPATH / "star_gifts.json"
 DATA_SAVER_DELAY = 5.
@@ -42,5 +42,5 @@ NOTIFY_TEXT_TITLES = {
     False: "❄️ A new gift has appeared"
 }
 
-NOTIFY_TEXT_TOTAL_AMOUNT: str = "\n🎯 Total amount: {total_amount}"
-NOTIFY_TEXT_AVAILABLE_AMOUNT: str = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%, updated at {updated_datetime} UTC)\n"
+NOTIFY_TEXT_TOTAL_AMOUNT = "\n🎯 Total amount: {total_amount}"
+NOTIFY_TEXT_AVAILABLE_AMOUNT = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%, updated at {updated_datetime} UTC)\n"
