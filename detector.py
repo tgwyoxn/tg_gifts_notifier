@@ -2,7 +2,7 @@ from pyrogram import Client, types
 from httpx import AsyncClient, TimeoutException
 from pytz import timezone as _timezone
 from io import BytesIO
-from itertools import cycle
+from itertools import cycle, groupby
 from bisect import bisect_left
 from functools import partial
 
@@ -230,7 +230,20 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
 
             continue
 
-        for new_star_gift in new_star_gifts:
+        new_star_gifts.sort(
+            key = lambda star_gift: star_gift.id
+        )
+
+        for new_star_gift in [
+            min(
+                gifts,
+                key = lambda star_gift: star_gift.available_amount
+            )
+            for _, gifts in groupby(
+                new_star_gifts,
+                key = lambda star_gift: star_gift.id
+            )
+        ]:
             if new_star_gift.message_id is None:
                 continue
 
