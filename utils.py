@@ -39,7 +39,7 @@ def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INF
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-    return logging.LoggerAdapter(logger, {"star_gift_id": "..."})
+    return logging.LoggerAdapter(logger, extra={"star_gift_id": "..."})
 
 
 def get_current_datetime(timezone: BaseTzInfo) -> str:

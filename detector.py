@@ -126,7 +126,7 @@ async def detector(
                 new_star_gift = all_star_gifts_dict.get(star_gift_id)
 
                 if new_star_gift is None:
-                    logger.warning(f"Star gift {star_gift_id} not found in new gifts, skipping for updating")
+                    logger.warning("Star gift not found in new gifts, skipping for updating", extra={"star_gift_id": str(star_gift_id)})
 
                     continue
 
@@ -263,7 +263,7 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
                 }
             )
 
-            logger.debug(f"Updated {new_star_gift.id} with {new_star_gift.available_amount} available amount")
+            logger.debug(f"Star gift updated with {new_star_gift.available_amount} available amount", extra={"star_gift_id": str(new_star_gift.id)})
 
         await star_gifts_data_saver(new_star_gifts)
 
