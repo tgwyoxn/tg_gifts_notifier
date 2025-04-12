@@ -123,7 +123,13 @@ async def detector(
 
         if update_gifts_queue:
             for star_gift_id, old_star_gift in old_star_gifts_dict.items():
-                new_star_gift = all_star_gifts_dict[star_gift_id]
+                new_star_gift = all_star_gifts_dict.get(star_gift_id)
+
+                if new_star_gift is None:
+                    logger.warning(f"Star gift {star_gift_id} not found in new gifts, skipping for updating")
+
+                    continue
+
                 new_star_gift.message_id = old_star_gift.message_id
 
                 if new_star_gift.available_amount < old_star_gift.available_amount:
