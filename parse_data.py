@@ -1,4 +1,9 @@
-from pyrogram import Client, raw
+from pyrogram import Client
+from pyrogram.raw.types.payments.star_gifts import StarGifts
+from pyrogram.raw.types.payments.star_gifts_not_modified import StarGiftsNotModified
+from pyrogram.raw.functions.payments.get_star_gifts import GetStarGifts
+from pyrogram.raw.types.star_gift import StarGift
+from pyrogram.raw.types.document_attribute_filename import DocumentAttributeFilename
 from pyrogram.file_id import FileId, FileType
 
 import typing
@@ -22,19 +27,19 @@ async def get_all_star_gifts(
     client: Client,
     hash: int | None = None
 ) -> tuple[int, dict[int, StarGiftData] | None]:
-    r: raw.types.payments.StarGifts | raw.types.payments.StarGiftsNotModified = await client.invoke(  # type: ignore
-        raw.functions.payments.GetStarGifts(  # type: ignore
+    r = typing.cast(StarGifts | StarGiftsNotModified, await client.invoke(
+        GetStarGifts(
             hash = hash or 0
         )
-    )
+    ))
 
-    if isinstance(r, raw.types.payments.StarGiftsNotModified):  # type: ignore
+    if isinstance(r, StarGiftsNotModified):
         return (
-            hash,  # type: ignore
+            typing.cast(int, hash),
             None
         )
 
-    r_gifts: list[raw.types.StarGift] = r.gifts  # type: ignore
+    r_gifts = typing.cast(list[StarGift], r.gifts)
 
     all_star_gifts_dict: dict[int, StarGiftData] = {
         star_gift_raw.id: StarGiftData(
@@ -42,16 +47,16 @@ async def get_all_star_gifts(
             number = number,
             sticker_file_id = FileId(
                 file_type = FileType.DOCUMENT,
-                dc_id = star_gift_raw.sticker.dc_id,  # type: ignore
-                media_id = star_gift_raw.sticker.id,  # type: ignore
-                access_hash = star_gift_raw.sticker.access_hash,  # type: ignore
-                file_reference = star_gift_raw.sticker.file_reference  # type: ignore
+                dc_id = typing.cast(int, star_gift_raw.sticker.dc_id),  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                media_id = typing.cast(int, star_gift_raw.sticker.id),  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                access_hash = typing.cast(int, star_gift_raw.sticker.access_hash),  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                file_reference = typing.cast(bytes, star_gift_raw.sticker.file_reference)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             ).encode(),
             sticker_file_name = next(
                 (
                     attr.file_name
-                    for attr in star_gift_raw.sticker.attributes  # type: ignore
-                    if isinstance(attr, raw.types.DocumentAttributeFilename)  # type: ignore
+                    for attr in typing.cast(list[DocumentAttributeFilename | typing.Any], star_gift_raw.sticker.attributes)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                    if isinstance(attr, DocumentAttributeFilename)
                 ),
                 f"{star_gift_raw.id}.tgs"  # hardcode
             ),
@@ -69,6 +74,6 @@ async def get_all_star_gifts(
     }
 
     return (
-        r.hash,  # type: ignore
+        r.hash,
         all_star_gifts_dict
     )

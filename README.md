@@ -8,6 +8,8 @@ Our Telegram Channel — [Gifts Detector](https://t.me/gifts_detector)
 
 ## Features
 
+**Note:** This project requires Python 3.10 or higher to run.
+
 - Real-time notifications
 - Easy setup and configuration
 - Customizable notification settings

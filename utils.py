@@ -14,7 +14,13 @@ class StrippingFormatter(logging.Formatter):
 
         return super().format(record)
 
-def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> logging.LoggerAdapter:  # type: ignore
+
+if typing.TYPE_CHECKING:
+    _LoggerAdapter = logging.LoggerAdapter[logging.Logger]
+else:
+    _LoggerAdapter = logging.LoggerAdapter
+
+def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> _LoggerAdapter:
     logger = logging.getLogger(name)
 
     logger.setLevel(min(console_log_level, file_log_level))
@@ -61,7 +67,7 @@ def pretty_float(number: float, get_is_same: typing.Literal[False]) -> str: ...
 
 def pretty_float(number: float, get_is_same: bool=False) -> tuple[str, bool] | str:
     formatted_number = float("{:.1g}".format(float(number)))
-    formatted_number_str = np.format_float_positional(formatted_number, trim='-')
+    formatted_number_str = np.format_float_positional(formatted_number, trim="-")
 
     if get_is_same:
         return (

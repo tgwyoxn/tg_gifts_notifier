@@ -23,9 +23,14 @@ timezone = _timezone(config.TIMEZONE)
 NULL_STR = ""
 
 
+T = typing.TypeVar("T")
 STAR_GIFT_RAW_T = dict[str, typing.Any]
 UPDATE_GIFTS_QUEUE_T = asyncio.Queue[tuple[StarGiftData, StarGiftData]]
-T = typing.TypeVar("T")
+
+BASIC_REQUEST_DATA = {
+    "parse_mode": "HTML",
+    "disable_web_page_preview": True
+}
 
 
 BOTS_AMOUNT = len(config.BOT_TOKENS)
@@ -42,7 +47,7 @@ if BOTS_AMOUNT > 0:
 STAR_GIFTS_DATA = StarGiftsData.load()
 last_star_gifts_data_saved_time: int | None = None
 
-logger = utils.get_logger(  # type: ignore
+logger = utils.get_logger(
     name = config.SESSION_NAME,
     log_filepath = constants.LOG_FILEPATH,
     console_log_level = config.CONSOLE_LOG_LEVEL,
@@ -51,12 +56,21 @@ logger = utils.get_logger(  # type: ignore
 
 
 @typing.overload
-async def bot_send_request(method: str, data: dict[str, typing.Any] | None) -> dict[str, typing.Any]: ...
+async def bot_send_request(
+    method: str,
+    data: dict[str, typing.Any] | None
+) -> dict[str, typing.Any]: ...
 
 @typing.overload
-async def bot_send_request(method: typing.Literal["editMessageText"], data: dict[str, typing.Any]) -> dict[str, typing.Any] | None: ...
+async def bot_send_request(
+    method: typing.Literal["editMessageText"],
+    data: dict[str, typing.Any]
+) -> dict[str, typing.Any] | None: ...
 
-async def bot_send_request(method: str, data: dict[str, typing.Any] | None=None) -> dict[str, typing.Any] | None:
+async def bot_send_request(
+    method: str,
+    data: dict[str, typing.Any] | None = None
+) -> dict[str, typing.Any] | None:
     logger.debug(f"Sending request {method} with data: {data}")
 
     retries = BOTS_AMOUNT
@@ -149,8 +163,7 @@ def get_notify_text(star_gift: StarGiftData) -> str:
             math.ceil(star_gift.available_amount / star_gift.total_amount * 100 * 100) / 100,
             get_is_same = True
         )
-        if is_limited
-        else
+        if is_limited else
         (
             NULL_STR,
             False
@@ -165,8 +178,7 @@ def get_notify_text(star_gift: StarGiftData) -> str:
             config.NOTIFY_TEXT_TOTAL_AMOUNT.format(
                 total_amount = utils.pretty_int(star_gift.total_amount)
             )
-            if is_limited
-            else
+            if is_limited else
             NULL_STR
         ),
         available_amount = (
@@ -174,15 +186,13 @@ def get_notify_text(star_gift: StarGiftData) -> str:
                 available_amount = utils.pretty_int(star_gift.available_amount),
                 same_str = (
                     NULL_STR
-                    if available_percentage_is_same
-                    else
+                    if available_percentage_is_same else
                     "~"
                 ),
                 available_percentage = available_percentage,
                 updated_datetime = utils.get_current_datetime(timezone)
             )
-            if is_limited
-            else
+            if is_limited else
             NULL_STR
         ),
         price = utils.pretty_int(star_gift.price),
@@ -191,17 +201,17 @@ def get_notify_text(star_gift: StarGiftData) -> str:
 
 
 async def process_new_gift(app: Client, star_gift: StarGiftData) -> None:
-    binary: BytesIO = await app.download_media(  # type: ignore
+    binary = typing.cast(BytesIO, await app.download_media(  # pyright: ignore[reportUnknownMemberType]
         message = star_gift.sticker_file_id,
         in_memory = True
-    )
+    ))
 
     binary.name = star_gift.sticker_file_name
 
-    sticker_message: types.Message = await app.send_sticker(  # type: ignore
+    sticker_message = typing.cast(types.Message, await app.send_sticker(  # pyright: ignore[reportUnknownMemberType]
         chat_id = config.NOTIFY_CHAT_ID,
         sticker = binary
-    )
+    ))
 
     await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
 
@@ -210,9 +220,8 @@ async def process_new_gift(app: Client, star_gift: StarGiftData) -> None:
         {
             "chat_id": config.NOTIFY_CHAT_ID,
             "text": get_notify_text(star_gift),
-            "reply_to_message_id": sticker_message.id,
-            "parse_mode": "HTML"
-        }
+            "reply_to_message_id": sticker_message.id
+        } | BASIC_REQUEST_DATA
     )
 
     star_gift.message_id = response["message_id"]
@@ -258,9 +267,8 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
                 {
                     "chat_id": config.NOTIFY_CHAT_ID,
                     "message_id": new_star_gift.message_id,
-                    "text": get_notify_text(new_star_gift),
-                    "parse_mode": "HTML"
-                }
+                    "text": get_notify_text(new_star_gift)
+                } | BASIC_REQUEST_DATA
             )
 
             logger.debug(f"Star gift updated with {new_star_gift.available_amount} available amount", extra={"star_gift_id": str(new_star_gift.id)})
@@ -303,9 +311,8 @@ async def star_gifts_data_saver(star_gifts: StarGiftData | list[StarGiftData]) -
 async def logger_wrapper(coro: typing.Awaitable[T]) -> T | None:
     try:
         return await coro
-
     except Exception as ex:
-        logger.exception(f"Error in {coro.__name__}: {ex}")  # type: ignore
+        logger.exception(f"""Error in {getattr(coro, "__name__", coro)}: {ex}""")
 
 
 async def main() -> None:
@@ -319,8 +326,7 @@ async def main() -> None:
 
     update_gifts_queue = (
         UPDATE_GIFTS_QUEUE_T()
-        if BOTS_AMOUNT > 0
-        else
+        if BOTS_AMOUNT > 0 else
         None
     )
 
@@ -344,6 +350,7 @@ async def main() -> None:
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-
     except KeyboardInterrupt:
+        pass
+    finally:
         STAR_GIFTS_DATA.save()
