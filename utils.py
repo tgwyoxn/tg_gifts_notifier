@@ -21,7 +21,7 @@ def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INF
 
     logger.setLevel(min(console_log_level, file_log_level))
 
-    formatter = StrippingFormatter("%(asctime)s - %(star_gift_id)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s")
+    formatter = StrippingFormatter("%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s")
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_log_level)
