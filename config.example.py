@@ -32,7 +32,7 @@ NOTIFY_TEXT = """\
 {title}
 
 № {number} (<code>{id}</code>)
-{total_amount}{available_amount}
+{total_amount}{available_amount}{sold_out}
 💎 Price: {price} ⭐️
 ♻️ Convert price: {convert_price} ⭐️
 """
@@ -44,3 +44,4 @@ NOTIFY_TEXT_TITLES = {
 
 NOTIFY_TEXT_TOTAL_AMOUNT = "\n🎯 Total amount: {total_amount}"
 NOTIFY_TEXT_AVAILABLE_AMOUNT = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%, updated at {updated_datetime} UTC)\n"
+NOTIFY_TEXT_SOLD_OUT = "\n⏰ Completely sold out in {sold_out}\n"

@@ -1,10 +1,9 @@
 from pydantic import BaseModel, Field
-from typing_extensions import Self
+from pathlib import Path
 
 import simplejson as json
 
 import constants
-import config
 
 
 class BaseConfigModel(BaseModel, extra="ignore"):
@@ -21,23 +20,31 @@ class StarGiftData(BaseConfigModel):
     available_amount: int
     total_amount: int
     is_limited: bool
+    first_appearance_timestamp: int | None = Field(default=None)  # None if posted before this update
     message_id: int | None = Field(default=None)
+    last_sale_timestamp: int | None = Field(default=None)
 
 
 class StarGiftsData(BaseConfigModel):
-    star_gifts: list[StarGiftData] = Field(default_factory=list)
+    DATA_FILEPATH: Path = Field(exclude=True)
+    star_gifts: list[StarGiftData] = Field(default_factory=list[StarGiftData])
 
     @classmethod
-    def load(cls) -> Self:
+    def load(cls, data_filepath: Path) -> "StarGiftsData":
         try:
-            with config.DATA_FILEPATH.open("r", encoding=constants.ENCODING) as file:
-                return cls.model_validate(json.load(file))
+            with data_filepath.open("r", encoding=constants.ENCODING) as file:
+                return cls.model_validate({
+                    **json.load(file),
+                    "DATA_FILEPATH": data_filepath
+                })
 
         except FileNotFoundError:
-            return cls()
+            return cls(
+                DATA_FILEPATH = data_filepath
+            )
 
     def save(self) -> None:
-        with config.DATA_FILEPATH.open("w", encoding=constants.ENCODING) as file:
+        with self.DATA_FILEPATH.open("w", encoding=constants.ENCODING) as file:
             json.dump(
                 obj = self.model_dump(),
                 fp = file,

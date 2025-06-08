@@ -6,6 +6,7 @@ from pyrogram.raw.types.star_gift import StarGift
 from pyrogram.raw.types.document_attribute_filename import DocumentAttributeFilename
 from pyrogram.file_id import FileId, FileType
 
+import utils
 import typing
 
 from star_gifts_data import StarGiftData
@@ -64,7 +65,9 @@ async def get_all_star_gifts(
             convert_price = star_gift_raw.convert_stars,
             available_amount = star_gift_raw.availability_remains or 0,
             total_amount = star_gift_raw.availability_total or 0,
-            is_limited = star_gift_raw.limited or False
+            is_limited = star_gift_raw.limited or False,
+            first_appearance_timestamp = star_gift_raw.first_sale_date or utils.get_current_timestamp(),
+            last_sale_timestamp = star_gift_raw.last_sale_date
         )
         for number, star_gift_raw in enumerate(sorted(
             r_gifts,

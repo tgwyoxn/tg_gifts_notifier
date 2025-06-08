@@ -44,7 +44,7 @@ if BOTS_AMOUNT > 0:
     BOT_TOKENS_CYCLE = cycle(config.BOT_TOKENS)
 
 
-STAR_GIFTS_DATA = StarGiftsData.load()
+STAR_GIFTS_DATA = StarGiftsData.load(config.DATA_FILEPATH)
 last_star_gifts_data_saved_time: int | None = None
 
 logger = utils.get_logger(
@@ -195,6 +195,13 @@ def get_notify_text(star_gift: StarGiftData) -> str:
             if is_limited else
             NULL_STR
         ),
+        sold_out = (
+            config.NOTIFY_TEXT_SOLD_OUT.format(
+                sold_out = utils.format_seconds_to_human_readable(star_gift.last_sale_timestamp - star_gift.first_appearance_timestamp)
+            )
+            if star_gift.last_sale_timestamp and star_gift.first_appearance_timestamp else
+            NULL_STR
+        ),
         price = utils.pretty_int(star_gift.price),
         convert_price = utils.pretty_int(star_gift.convert_price)
     )
@@ -234,7 +241,9 @@ async def process_update_gifts(update_gifts_queue: UPDATE_GIFTS_QUEUE_T) -> None
         while True:
             try:
                 _, new_star_gift = update_gifts_queue.get_nowait()
+
                 new_star_gifts.append(new_star_gift)
+
                 update_gifts_queue.task_done()
 
             except asyncio.QueueEmpty:
@@ -321,7 +330,8 @@ async def main() -> None:
     app = Client(
         name = config.SESSION_NAME,
         api_id = config.API_ID,
-        api_hash = config.API_HASH
+        api_hash = config.API_HASH,
+        sleep_threshold = 60
     )
 
     update_gifts_queue = (

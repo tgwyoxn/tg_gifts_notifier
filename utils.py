@@ -5,6 +5,7 @@ from pytz.tzinfo import BaseTzInfo
 
 import logging
 import numpy as np
+import time
 import typing
 
 
@@ -52,7 +53,7 @@ def get_current_datetime(timezone: BaseTzInfo) -> str:
     return datetime.now(tz=timezone).strftime("%d-%m-%Y %H:%M:%S")
 
 def get_current_timestamp() -> int:
-    return int(datetime.now().timestamp())
+    return int(time.time())
 
 
 def pretty_int(number: int) -> str:
@@ -76,3 +77,40 @@ def pretty_float(number: float, get_is_same: bool=False) -> tuple[str, bool] | s
         )
 
     return formatted_number_str
+
+
+def format_seconds_to_human_readable(total_seconds: int) -> str:
+    total_seconds = int(total_seconds)
+
+    if total_seconds < 0:
+        total_seconds = 0
+
+    days = total_seconds // (24 * 3600)
+    total_seconds %= (24 * 3600)
+    hours = total_seconds // 3600
+    total_seconds %= 3600
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+
+    parts: list[str] = []
+
+    if days > 0:
+        parts.append(f"{days} day" + ("s" if days != 1 else ""))
+    if hours > 0:
+        parts.append(f"{hours} hour" + ("s" if hours != 1 else ""))
+    if minutes > 0:
+        parts.append(f"{minutes} minute" + ("s" if minutes != 1 else ""))
+
+    if seconds > 0 or (not parts and total_seconds == 0):
+        parts.append(f"{seconds} second" + ("s" if seconds != 1 else ""))
+
+    if not parts:
+        return "0 seconds"
+
+    elif len(parts) == 1:
+        return parts[0]
+
+    elif len(parts) == 2:
+        return f"{parts[0]} and {parts[1]}"
+
+    return ", ".join(parts[:-1]) + f" and {parts[-1]}"
