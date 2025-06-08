@@ -21,8 +21,10 @@ class StarGiftData(BaseConfigModel):
     total_amount: int
     is_limited: bool
     first_appearance_timestamp: int | None = Field(default=None)  # None if posted before this update
+    channel_number_sent_to: int | None = Field(default=1)  # None if not sent, 1 - main channel (@gifts_detector), 2 - upgrades channel (@gifts_upgrades_detector)
     message_id: int | None = Field(default=None)
     last_sale_timestamp: int | None = Field(default=None)
+    is_upgradable: bool = Field(default=False)
 
 
 class StarGiftsData(BaseConfigModel):

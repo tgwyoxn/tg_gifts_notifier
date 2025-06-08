@@ -10,7 +10,7 @@ import math
 import asyncio
 import typing
 
-from parse_data import get_all_star_gifts
+from parse_data import get_all_star_gifts, check_is_star_gift_upgradable
 from star_gifts_data import StarGiftData, StarGiftsData
 
 import utils
@@ -231,6 +231,7 @@ async def process_new_gift(app: Client, star_gift: StarGiftData) -> None:
         } | BASIC_REQUEST_DATA
     )
 
+    star_gift.channel_number_sent_to = 1  # Main channel (@gifts_detector)
     star_gift.message_id = response["message_id"]
 
 
@@ -317,6 +318,80 @@ async def star_gifts_data_saver(star_gifts: StarGiftData | list[StarGiftData]) -
             logger.debug("Saved star gifts data file")
 
 
+async def star_gifts_upgrades_checker(app: Client) -> None:
+    while True:
+        for star_gift_id, star_gift in {
+            star_gift.id: star_gift
+            for star_gift in STAR_GIFTS_DATA.star_gifts
+            if not star_gift.is_upgradable
+        }.items():
+            if await check_is_star_gift_upgradable(
+                app = app,
+                star_gift_id = star_gift_id
+            ):
+                logger.info(f"Star gift {star_gift_id} is upgradable")
+
+                if not star_gift.channel_number_sent_to or not star_gift.message_id:
+                    logger.debug(f"Star gift {star_gift_id} is upgradable and it wasn't sent to main channel, sending to upgrades channel")
+
+                    binary = typing.cast(BytesIO, await app.download_media(  # pyright: ignore[reportUnknownMemberType]
+                        message = star_gift.sticker_file_id,
+                        in_memory = True
+                    ))
+
+                    binary.name = star_gift.sticker_file_name
+
+                    sticker_message = typing.cast(types.Message, await app.send_sticker(  # pyright: ignore[reportUnknownMemberType]
+                        chat_id = config.NOTIFY_CHAT_ID,
+                        sticker = binary
+                    ))
+
+                    await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
+
+                    response = await bot_send_request(
+                        "sendMessage",
+                        {
+                            "chat_id": config.NOTIFY_CHAT_ID,
+                            "text": get_notify_text(star_gift),
+                            "reply_to_message_id": sticker_message.id
+                        } | BASIC_REQUEST_DATA
+                    )
+
+                    star_gift.channel_number_sent_to = 2  # Upgrades channel (@gifts_upgrades_detector)
+                    star_gift.message_id = response["message_id"]
+
+                logger.debug(f"Sending upgrade notification for star gift {star_gift_id} (ch #{star_gift.channel_number_sent_to}, msg #{star_gift.message_id})")
+
+                await bot_send_request(
+                    "sendMessage",
+                    {
+                        "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
+                        "text": config.NOTIFY_UPGRADES_TEXT.format(
+                            sticker_url = NULL_STR
+                        ),
+                        "reply_parameters": {
+                            "chat_id": (
+                                config.NOTIFY_CHAT_ID
+                                if star_gift.channel_number_sent_to == 1 else
+                                config.NOTIFY_UPGRADES_CHAT_ID
+                            ),
+                            "message_id": star_gift.message_id
+                        }
+                    } | BASIC_REQUEST_DATA
+                )
+
+                star_gift.is_upgradable = True
+
+                await star_gifts_data_saver(star_gift)
+
+            else:
+                logger.debug(f"Star gift {star_gift_id} is not upgradable")
+
+            await asyncio.sleep(config.CHECK_UPGRADES_INTERVAL)
+
+        await asyncio.sleep(config.CHECK_UPGRADES_PER_CYCLE)
+
+
 async def logger_wrapper(coro: typing.Awaitable[T]) -> T | None:
     try:
         return await coro
@@ -334,6 +409,8 @@ async def main() -> None:
         sleep_threshold = 60
     )
 
+    await app.start()
+
     update_gifts_queue = (
         UPDATE_GIFTS_QUEUE_T()
         if BOTS_AMOUNT > 0 else
@@ -349,6 +426,14 @@ async def main() -> None:
 
     else:
         logger.info("No bots available, skipping update gifts processing")
+
+    if config.NOTIFY_UPGRADES_CHAT_ID:
+        asyncio.create_task(logger_wrapper(
+            star_gifts_upgrades_checker(app)
+        ))
+
+    else:
+        logger.info("Upgrades channel is not set, skipping star gifts upgrades checking")
 
     await detector(
         app = app,
