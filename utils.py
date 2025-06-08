@@ -16,12 +16,7 @@ class StrippingFormatter(logging.Formatter):
         return super().format(record)
 
 
-if typing.TYPE_CHECKING:
-    _LoggerAdapter = logging.LoggerAdapter[logging.Logger]
-else:
-    _LoggerAdapter = logging.LoggerAdapter
-
-def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> _LoggerAdapter:
+def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INFO, file_log_level: int=logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
 
     logger.setLevel(min(console_log_level, file_log_level))
@@ -46,7 +41,7 @@ def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INF
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-    return logging.LoggerAdapter(logger, extra={"star_gift_id": "..."})
+    return logger
 
 
 def get_current_datetime(timezone: BaseTzInfo) -> str:

@@ -53,4 +53,3 @@ NOTIFY_TEXT_AVAILABLE_AMOUNT = "\n❓ Available amount: {available_amount} ({sam
 NOTIFY_TEXT_SOLD_OUT = "\n⏰ Completely sold out in {sold_out}\n"
 
 NOTIFY_UPGRADES_TEXT = "{sticker_url}Gift is upgradable!"
-# NOTIFY_UPGRADES_STICKER_URL_TEXT = "<a href=\"https://t.me/gifts_detector/{message_id}\">⁣</a>"  # invisible character
