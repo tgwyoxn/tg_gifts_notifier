@@ -1,4 +1,4 @@
-from pyrogram import Client, types, enums
+from pyrogram import Client, types
 from httpx import AsyncClient, TimeoutException
 from pytz import timezone as _timezone
 from io import BytesIO
@@ -231,7 +231,6 @@ async def process_new_gift(app: Client, star_gift: StarGiftData) -> None:
         } | BASIC_REQUEST_DATA
     )
 
-    star_gift.channel_number_sent_to = 1  # Main channel (@gifts_detector)
     star_gift.message_id = response["message_id"]
 
 
@@ -331,55 +330,38 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
             ):
                 logger.info(f"Star gift {star_gift_id} is upgradable")
 
-                if not star_gift.channel_number_sent_to or not star_gift.message_id:
-                    logger.debug(f"Star gift {star_gift_id} is upgradable and it wasn't sent to main channel, sending to upgrades channel")
+                logger.debug(f"Sending upgrade notification for star gift {star_gift_id} (msg #{star_gift.message_id})")
 
-                    binary = typing.cast(BytesIO, await app.download_media(  # pyright: ignore[reportUnknownMemberType]
-                        message = star_gift.sticker_file_id,
-                        in_memory = True
-                    ))
+                binary = typing.cast(BytesIO, await app.download_media(  # pyright: ignore[reportUnknownMemberType]
+                    message = star_gift.sticker_file_id,
+                    in_memory = True
+                ))
 
-                    binary.name = star_gift.sticker_file_name
+                binary.name = star_gift.sticker_file_name
 
-                    sticker_message = typing.cast(types.Message, await app.send_sticker(  # pyright: ignore[reportUnknownMemberType]
-                        chat_id = config.NOTIFY_UPGRADES_CHAT_ID,
-                        sticker = binary
-                    ))
-
-                    await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
-
-                    response = await bot_send_request(
-                        "sendMessage",
-                        {
-                            "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
-                            "text": get_notify_text(star_gift),
-                            "reply_to_message_id": sticker_message.id
-                        } | BASIC_REQUEST_DATA
-                    )
-
-                    star_gift.channel_number_sent_to = 2  # Upgrades channel (@gifts_upgrades_detector)
-                    star_gift.message_id = response["message_id"]
-
-                logger.debug(f"Sending upgrade notification for star gift {star_gift_id} (ch #{star_gift.channel_number_sent_to}, msg #{star_gift.message_id})")
-
-                await app.send_message(
+                sticker_message = typing.cast(types.Message, await app.send_sticker(  # pyright: ignore[reportUnknownMemberType]
                     chat_id = config.NOTIFY_UPGRADES_CHAT_ID,
-                    text = config.NOTIFY_UPGRADES_TEXT,
-                    reply_to_chat_id = (
-                        config.NOTIFY_CHAT_ID
-                        if star_gift.channel_number_sent_to == 1 else
-                        config.NOTIFY_UPGRADES_CHAT_ID
-                    ),
-                    reply_to_message_id = typing.cast(int, star_gift.message_id),
-                    parse_mode = enums.ParseMode.HTML,
-                    disable_web_page_preview = True
+                    sticker = binary
+                ))
+
+                await asyncio.sleep(config.NOTIFY_AFTER_STICKER_DELAY)
+
+                await bot_send_request(
+                    "sendMessage",
+                    {
+                        "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
+                        "text": config.NOTIFY_UPGRADES_TEXT.format(
+                            id = star_gift.id
+                        ),
+                        "reply_to_message_id": sticker_message.id
+                    } | BASIC_REQUEST_DATA
                 )
 
                 star_gift.is_upgradable = True
 
                 await star_gifts_data_saver(star_gift)
 
-                await asyncio.sleep(config.NOTIFY_AFTER_UPGRADES_DELAY)
+                await asyncio.sleep(config.NOTIFY_AFTER_TEXT_DELAY)
 
             else:
                 logger.debug(f"Star gift {star_gift_id} is not upgradable")
