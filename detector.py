@@ -342,7 +342,7 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
                     binary.name = star_gift.sticker_file_name
 
                     sticker_message = typing.cast(types.Message, await app.send_sticker(  # pyright: ignore[reportUnknownMemberType]
-                        chat_id = config.NOTIFY_CHAT_ID,
+                        chat_id = config.NOTIFY_UPGRADES_CHAT_ID,
                         sticker = binary
                     ))
 
@@ -351,7 +351,7 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
                     response = await bot_send_request(
                         "sendMessage",
                         {
-                            "chat_id": config.NOTIFY_CHAT_ID,
+                            "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
                             "text": get_notify_text(star_gift),
                             "reply_to_message_id": sticker_message.id
                         } | BASIC_REQUEST_DATA

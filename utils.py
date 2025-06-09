@@ -1,7 +1,6 @@
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
-from datetime import datetime
-from pytz.tzinfo import BaseTzInfo
+from datetime import datetime, tzinfo
 
 import logging
 import numpy as np
@@ -44,7 +43,7 @@ def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INF
     return logger
 
 
-def get_current_datetime(timezone: BaseTzInfo) -> str:
+def get_current_datetime(timezone: tzinfo) -> str:
     return datetime.now(tz=timezone).strftime("%d-%m-%Y %H:%M:%S")
 
 def get_current_timestamp() -> int:
