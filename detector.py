@@ -1,4 +1,4 @@
-from pyrogram import Client, types
+from pyrogram import Client, types, enums
 from httpx import AsyncClient, TimeoutException
 from pytz import timezone as _timezone
 from io import BytesIO
@@ -362,27 +362,24 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
 
                 logger.debug(f"Sending upgrade notification for star gift {star_gift_id} (ch #{star_gift.channel_number_sent_to}, msg #{star_gift.message_id})")
 
-                await bot_send_request(
-                    "sendMessage",
-                    {
-                        "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
-                        "text": config.NOTIFY_UPGRADES_TEXT.format(
-                            sticker_url = NULL_STR
-                        ),
-                        "reply_parameters": {
-                            "chat_id": (
-                                config.NOTIFY_CHAT_ID
-                                if star_gift.channel_number_sent_to == 1 else
-                                config.NOTIFY_UPGRADES_CHAT_ID
-                            ),
-                            "message_id": star_gift.message_id
-                        }
-                    } | BASIC_REQUEST_DATA
+                await app.send_message(
+                    chat_id = config.NOTIFY_UPGRADES_CHAT_ID,
+                    text = config.NOTIFY_UPGRADES_TEXT,
+                    reply_to_chat_id = (
+                        config.NOTIFY_CHAT_ID
+                        if star_gift.channel_number_sent_to == 1 else
+                        config.NOTIFY_UPGRADES_CHAT_ID
+                    ),
+                    reply_to_message_id = typing.cast(int, star_gift.message_id),
+                    parse_mode = enums.ParseMode.HTML,
+                    disable_web_page_preview = True
                 )
 
                 star_gift.is_upgradable = True
 
                 await star_gifts_data_saver(star_gift)
+
+                await asyncio.sleep(config.NOTIFY_AFTER_UPGRADES_DELAY)
 
             else:
                 logger.debug(f"Star gift {star_gift_id} is not upgradable")

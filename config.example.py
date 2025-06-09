@@ -28,6 +28,7 @@ NOTIFY_UPGRADES_CHAT_ID = -1002751596218  # https://t.me/gifts_upgrades_detector
                                           # Telegram will raise [400 BOT_METHOD_INVALID]
 NOTIFY_AFTER_STICKER_DELAY = 1.
 NOTIFY_AFTER_TEXT_DELAY = 2.
+NOTIFY_AFTER_UPGRADES_DELAY = 1.
 TIMEZONE = "UTC"
 CONSOLE_LOG_LEVEL = logging.DEBUG
 FILE_LOG_LEVEL = logging.INFO
