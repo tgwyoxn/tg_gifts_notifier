@@ -53,4 +53,4 @@ NOTIFY_TEXT_TOTAL_AMOUNT = "\n🎯 Total amount: {total_amount}"
 NOTIFY_TEXT_AVAILABLE_AMOUNT = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%, updated at {updated_datetime} UTC)\n"
 NOTIFY_TEXT_SOLD_OUT = "\n⏰ Completely sold out in {sold_out}\n"
 
-NOTIFY_UPGRADES_TEXT = "{sticker_url}Gift is upgradable!"
+NOTIFY_UPGRADES_TEXT = "Gift is upgradable!"
