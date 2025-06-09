@@ -384,8 +384,6 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
             else:
                 logger.debug(f"Star gift {star_gift_id} is not upgradable")
 
-            await asyncio.sleep(config.CHECK_UPGRADES_INTERVAL)
-
         await asyncio.sleep(config.CHECK_UPGRADES_PER_CYCLE)
 
 
