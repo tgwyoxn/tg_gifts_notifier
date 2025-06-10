@@ -52,17 +52,22 @@ At first rename `config.example.py` to `config.py`.
 
 Then, you must configure the notifier by editing the `config.py` file.
 
-| Field                      | Type      | Description                                                         |
-|-------------------|---------|---------------------------------------------------------------------|
-| API_ID                     | Integer   | Your Telegram API ID obtained from my.telegram.org                  |
-| API_HASH                   | String    | Your Telegram API Hash corresponding to your API ID                 |
-| BOT_TOKENS                 | [String]  | Bot tokens provided by [BotFather](https://t.me/BotFather) of your Telegram bot            |
-| CHECK_INTERVAL             | Float     | Time interval (in seconds) between checks for new gifts             |
-| DATA_FILEPATH              | String    | Path to the file where the gift data is stored                      |
-| NOTIFY_CHAT_ID             | Integer   | Chat ID where notifications are delivered                           |
-| NOTIFY_AFTER_STICKER_DELAY | Float     | Delay (in seconds) after sending a sticker before sending a message |
-| NOTIFY_AFTER_TEXT_DELAY    | Float     | Delay (in seconds) after sending a message |
-| TIMEZONE                   | String    | Timezone for the bot (e.g., "Europe/Moscow")                        |
+| Field                      | Type              | Description                                                                                               |
+|----------------------------|-------------------|-----------------------------------------------------------------------------------------------------------|
+| SESSION_NAME               | String            | Name of the session file where the userbot's session will be stored                                       |
+| API_ID                     | Integer           | Your Telegram API ID obtained from my.telegram.org                                                        |
+| API_HASH                   | String            | Your Telegram API Hash corresponding to your API ID                                                       |
+| BOT_TOKENS                 | [String]          | Bot tokens provided by [BotFather](https://t.me/BotFather) of your Telegram bot to send and edit messages |
+| CHECK_INTERVAL             | Float             | Time interval (in seconds) between checks for new gifts                                                   |
+| CHECK_UPGRADES_PER_CYCLE   | Float             | Time interval (in seconds) to check upgradability of gifts per cycle                                      |
+| DATA_FILEPATH              | String            | Path to the file where the gift data is stored                                                            |
+| DATA_SAVER_DELAY           | Float             | Delay (in seconds) to save data to the file                                                               |
+| NOTIFY_CHAT_ID             | Integer           | Chat ID where new gifts' messages will be sent                                                            |
+| NOTIFY_UPGRADES_CHAT_ID    | Integer or `None` | Chat ID where gifts' upgradability messages will be sent                                                  |
+| NOTIFY_AFTER_STICKER_DELAY | Float             | Delay (in seconds) after sending a sticker before sending a message                                       |
+| NOTIFY_AFTER_TEXT_DELAY    | Float             | Delay (in seconds) after sending a message                                                                |
+| TIMEZONE                   | String            | Timezone for the messages' date & time (e.g., "Europe/Moscow")                                            |
+| HTTP_REQUEST_TIMEOUT       | Float             | Timeout for Bot API requests (in seconds)                                                                 |
 
 ## Contact
 
