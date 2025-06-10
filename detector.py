@@ -294,20 +294,19 @@ async def star_gifts_data_saver(star_gifts: StarGiftData | list[StarGiftData]) -
         if not isinstance(star_gifts, list):
             star_gifts = [star_gifts]
 
-        current_star_gift_ids = [
-            gift.id
-            for gift in STAR_GIFTS_DATA.star_gifts
-        ]
+        updated_gifts_list = list(STAR_GIFTS_DATA.star_gifts)
 
         for star_gift in star_gifts:
-            pos = bisect_left(current_star_gift_ids, star_gift.id)
+            pos = bisect_left([
+                gift.id
+                for gift in updated_gifts_list
+            ], star_gift.id)
 
-            if pos < len(current_star_gift_ids) and current_star_gift_ids[pos] == star_gift.id:
-                STAR_GIFTS_DATA.star_gifts[pos] = star_gift
+            if pos < len(updated_gifts_list) and updated_gifts_list[pos].id == star_gift.id:
+                updated_gifts_list[pos] = star_gift
 
             else:
-                STAR_GIFTS_DATA.star_gifts.insert(pos, star_gift)
-                current_star_gift_ids.insert(pos, star_gift.id)
+                updated_gifts_list.insert(pos, star_gift)
 
         if last_star_gifts_data_saved_time is None or last_star_gifts_data_saved_time + config.DATA_SAVER_DELAY < utils.get_current_timestamp():
             STAR_GIFTS_DATA.save()
@@ -351,7 +350,7 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
                     {
                         "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
                         "text": config.NOTIFY_UPGRADES_TEXT.format(
-                            id = star_gift.id
+                            id = star_gift_id
                         ),
                         "reply_to_message_id": sticker_message.id
                     } | BASIC_REQUEST_DATA
