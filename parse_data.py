@@ -68,12 +68,11 @@ async def get_all_star_gifts(
             total_amount = star_gift_raw.availability_total or 0,
             is_limited = star_gift_raw.limited or False,
             first_appearance_timestamp = star_gift_raw.first_sale_date or utils.get_current_timestamp(),
-            channel_number_sent_to = None,
             last_sale_timestamp = star_gift_raw.last_sale_date
         )
         for number, star_gift_raw in enumerate(sorted(
             r_gifts,
-            key = lambda star_gift_raw: star_gift_raw.id,
+            key = lambda sgr: sgr.id,
             reverse = False
         ), 1)
     }

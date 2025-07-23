@@ -1,4 +1,4 @@
-pyrofork == 2.3.61
+pyrofork @ git+https://github.com/arynyklas/pyrofork@42e9410aadab33257b878a9e06e7ade125e14cc
 tgcrypto-pyrofork == 1.2.7
 pytz == 2024.2
 numpy == 2.1.2

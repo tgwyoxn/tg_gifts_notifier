@@ -8,6 +8,7 @@
 *.service
 config*.py
 logs/
+**copy**
 
 !requirements.txt
 !config.example.py

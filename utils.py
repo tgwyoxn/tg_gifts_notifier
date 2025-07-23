@@ -29,7 +29,7 @@ def get_logger(name: str, log_filepath: Path, console_log_level: int=logging.INF
     file_handler = RotatingFileHandler(
         filename = log_filepath.resolve().as_posix(),
         mode = "a",
-        maxBytes = 1028 * 1024,  # 1 MB
+        maxBytes = 10 * 1024 * 1024,  # 10 MB
         backupCount = 1_000,
         encoding = "utf-8"
     )
