@@ -46,6 +46,12 @@ To start the notifier, run:
 python detector.py
 ```
 
+If you want to just fetch the gifts data with removing current data, use the `--save-only`/`-S` flag:
+
+```sh
+python detector.py --save-only
+```
+
 ## Configuration
 
 At first rename `config.example.py` to `config.py`.

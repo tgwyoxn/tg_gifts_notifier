@@ -31,7 +31,12 @@ class StarGiftsData(BaseConfigModel):
     star_gifts: list[StarGiftData] = Field(default_factory=list[StarGiftData])
 
     @classmethod
-    def load(cls, data_filepath: Path) -> "StarGiftsData":
+    def load(cls, data_filepath: Path, new: bool=False) -> "StarGiftsData":
+        if new:
+            return cls(
+                DATA_FILEPATH = data_filepath
+            )
+
         try:
             with data_filepath.open("r", encoding=constants.ENCODING) as file:
                 return cls.model_validate({
