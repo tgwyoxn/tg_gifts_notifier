@@ -16,8 +16,7 @@ from star_gifts_data import StarGiftData, StarGiftsData
 import utils
 import userbot_helpers
 import constants
-# import config
-import config_test as config
+import config
 
 
 timezone = _timezone(config.TIMEZONE)
