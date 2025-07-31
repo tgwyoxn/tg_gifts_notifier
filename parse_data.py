@@ -66,6 +66,8 @@ async def get_all_star_gifts(
             convert_price = star_gift_raw.convert_stars,
             available_amount = star_gift_raw.availability_remains or 0,
             total_amount = star_gift_raw.availability_total or 0,
+            require_premium = star_gift_raw.require_premium or False,
+            user_limited = (star_gift_raw.per_user_total or 0) if star_gift_raw.limited_per_user else None,
             is_limited = star_gift_raw.limited or False,
             first_appearance_timestamp = star_gift_raw.first_sale_date or utils.get_current_timestamp(),
             last_sale_timestamp = star_gift_raw.last_sale_date

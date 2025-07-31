@@ -16,12 +16,12 @@ from star_gifts_data import StarGiftData, StarGiftsData
 import utils
 import userbot_helpers
 import constants
-import config
+# import config
+import config_test as config
 
 
 timezone = _timezone(config.TIMEZONE)
 
-NULL_STR = ""
 USERBOT_SLEEP_THRESHOLD = 60
 BATCH_STICKERS_DOWNLOAD = True
 
@@ -259,7 +259,7 @@ async def detector(
 def get_notify_text(star_gift: StarGiftData) -> str:
     is_limited = star_gift.is_limited
 
-    available_percentage_str = NULL_STR
+    available_percentage_str = constants.NULL_STR
     available_percentage_is_same = False
 
     if is_limited and star_gift.total_amount > 0:
@@ -277,13 +277,13 @@ def get_notify_text(star_gift: StarGiftData) -> str:
                 total_amount = utils.pretty_int(star_gift.total_amount)
             )
             if is_limited else
-            NULL_STR
+            constants.NULL_STR
         ),
         available_amount = (
             config.NOTIFY_TEXT_AVAILABLE_AMOUNT.format(
                 available_amount = utils.pretty_int(star_gift.available_amount),
                 same_str = (
-                    NULL_STR
+                    constants.NULL_STR
                     if available_percentage_is_same else
                     "~"
                 ),
@@ -291,17 +291,41 @@ def get_notify_text(star_gift: StarGiftData) -> str:
                 updated_datetime = utils.get_current_datetime(timezone)
             )
             if is_limited else
-            NULL_STR
+            constants.NULL_STR
         ),
         sold_out = (
             config.NOTIFY_TEXT_SOLD_OUT.format(
                 sold_out = utils.format_seconds_to_human_readable(star_gift.last_sale_timestamp - star_gift.first_appearance_timestamp)
             )
             if star_gift.last_sale_timestamp and star_gift.first_appearance_timestamp else
-            NULL_STR
+            constants.NULL_STR
         ),
         price = utils.pretty_int(star_gift.price),
-        convert_price = utils.pretty_int(star_gift.convert_price)
+        convert_price = utils.pretty_int(star_gift.convert_price),
+        require_premium_or_user_limited = (
+            config.NOTIFY_TEXT_REQUIRE_PREMIUM_OR_USER_LIMITED.format(
+                emoji = config.NOTIFY_TEXT_REQUIRE_PREMIUM_OR_USER_LIMITED_EMOJI,
+                require_premium = (
+                    config.NOTIFY_TEXT_REQUIRE_PREMIUM
+                    if star_gift.require_premium else
+                    constants.NULL_STR
+                ),
+                user_limited = (
+                    config.NOTIFY_TEXT_USER_LIMITED.format(
+                        user_limited = utils.pretty_int(star_gift.user_limited)
+                    )
+                    if star_gift.user_limited is not None else
+                    constants.NULL_STR
+                ),
+                separator = (
+                    config.NOTIFY_TEXT_REQUIRE_PREMIUM_AND_USER_LIMITED_SEPARATOR
+                    if star_gift.require_premium and star_gift.user_limited is not None else
+                    constants.NULL_STR
+                )
+            )
+            if star_gift.require_premium or star_gift.user_limited is not None else
+            constants.NULL_STR
+        )
     )
 
 
