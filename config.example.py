@@ -40,6 +40,7 @@ NOTIFY_TEXT = """\
 {total_amount}{available_amount}{sold_out}
 💎 Price: {price} ⭐️
 ♻️ Convert price: {convert_price} ⭐️
+{require_premium_or_user_limited}
 """
 
 NOTIFY_TEXT_TITLES = {
@@ -50,5 +51,10 @@ NOTIFY_TEXT_TITLES = {
 NOTIFY_TEXT_TOTAL_AMOUNT = "\n🎯 Total amount: {total_amount}"
 NOTIFY_TEXT_AVAILABLE_AMOUNT = "\n❓ Available amount: {available_amount} ({same_str}{available_percentage}%, updated at {updated_datetime} UTC)\n"
 NOTIFY_TEXT_SOLD_OUT = "\n⏰ Completely sold out in {sold_out}\n"
+NOTIFY_TEXT_REQUIRE_PREMIUM_OR_USER_LIMITED = "\n{emoji} {require_premium}{separator}{user_limited}\n"
+NOTIFY_TEXT_REQUIRE_PREMIUM_OR_USER_LIMITED_EMOJI = "✨"
+NOTIFY_TEXT_REQUIRE_PREMIUM = "<b>Premium only</b>"
+NOTIFY_TEXT_USER_LIMITED = "<b>{user_limited} per user</b>"
+NOTIFY_TEXT_REQUIRE_PREMIUM_AND_USER_LIMITED_SEPARATOR = " | "
 
 NOTIFY_UPGRADES_TEXT = "Gift is upgradable! (<code>{id}</code>)"
