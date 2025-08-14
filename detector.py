@@ -163,7 +163,8 @@ async def detector(
 
             continue
 
-        current_hash = new_hash
+        if not update_gifts_queue:
+            current_hash = new_hash
 
         old_star_gifts_dict = {
             star_gift.id: star_gift
