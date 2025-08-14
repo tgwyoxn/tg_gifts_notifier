@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 ENCODING = "utf-8"
+NULL_STR = ""
 
 WORK_DIRPATH = Path(__file__).parent
 LOGS_DIRPATH = WORK_DIRPATH / "logs"

@@ -19,6 +19,8 @@ class StarGiftData(BaseConfigModel):
     convert_price: int
     available_amount: int
     total_amount: int
+    require_premium: bool = Field(default=False)
+    user_limited: int | None = Field(default=None)
     is_limited: bool
     first_appearance_timestamp: int | None = Field(default=None)  # None if posted before this update
     message_id: int | None = Field(default=None)
