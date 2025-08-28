@@ -44,6 +44,9 @@ if BOTS_AMOUNT > 0:
     )
 
     BOT_TOKENS_CYCLE = cycle(config.BOT_TOKENS)
+    PRIMARY_BOT_TOKEN = config.BOT_TOKENS[0]
+else:
+    PRIMARY_BOT_TOKEN = None
 
 
 STAR_GIFTS_DATA = StarGiftsData.load(config.DATA_FILEPATH)
@@ -110,6 +113,45 @@ async def bot_send_request(
         logger.warning(f"Telegram API error for method {method}: {response}")
 
     raise RuntimeError(f"Failed to send request to Telegram API after multiple retries. Last response: {response}")
+
+
+async def bot_send_request_primary(
+    method: str,
+    data: dict[str, typing.Any] | None = None
+) -> dict[str, typing.Any] | None:
+    """
+    То же самое, что bot_send_request, но всегда через ПЕРВЫЙ токен (PRIMARY_BOT_TOKEN).
+    Нужен для long-poll getUpdates и /start-теста, чтобы всё шло через один и тот же бот.
+    """
+    if not PRIMARY_BOT_TOKEN:
+        raise RuntimeError("No PRIMARY_BOT_TOKEN available")
+
+    logger.debug(f"[primary] Sending request {method} with data: {data}")
+
+    response = None
+
+    try:
+        response = (await BOT_HTTP_CLIENT.post(
+            f"/bot{PRIMARY_BOT_TOKEN}/{method}",
+            json = data
+        )).json()
+
+    except TimeoutException:
+        logger.warning(f"[primary] Timeout exception while sending request {method} with data: {data}")
+        return None
+
+    except Exception as ex:
+        logger.error(f"[primary] An error occurred while sending request {method}: {ex}")
+        return None
+
+    if response and response.get("ok"):
+        return response.get("result")
+
+    if method == "editMessageText" and response and isinstance(response.get("description"), str) and "message is not modified" in response["description"]:
+        return None
+
+    logger.warning(f"[primary] Telegram API error for method {method}: {response}")
+    return None
 
 
 async def detector(
@@ -578,6 +620,180 @@ async def star_gifts_upgrades_checker(app: Client) -> None:
         await asyncio.sleep(config.CHECK_UPGRADES_PER_CYCLE)
 
 
+# =========================
+#     /start ПОЛЛЕР
+# =========================
+
+async def _get_chat_label(chat_id: int | str) -> str:
+    """Пытается получить human-readable название чата через первичный бот."""
+    try:
+        chat = await bot_send_request_primary("getChat", {"chat_id": chat_id})
+        if not chat:
+            return str(chat_id)
+        title = chat.get("title") or chat.get("username") or str(chat_id)
+        if chat.get("username"):
+            return f"@{chat['username']}"
+        return title
+    except Exception:
+        return str(chat_id)
+
+
+async def start_command_poller() -> None:
+    """
+    Лёгкий long-poll getUpdates для обработки команды /start у ПЕРВОГО бота из списка.
+    На /start бот:
+      1) отвечает в личку пользователю, что детектор запущен;
+      2) (опционально) отправляет тестовые сообщения в канал(ы) уведомлений.
+    Включается, если есть хотя бы один токен.
+    """
+    if not PRIMARY_BOT_TOKEN:
+        logger.info("No PRIMARY_BOT_TOKEN, skipping /start poller.")
+        return
+
+    # Настройки с дефолтами
+    long_poll_timeout: int = getattr(config, "BOT_UPDATES_TIMEOUT", 50)
+    send_tests_to_channels: bool = getattr(config, "START_SEND_TEST_TO_CHANNELS", True)
+
+    # Админы, если указаны в конфиге — ограничиваем право триггерить тест в каналах
+    admins: set[int] | None = None
+    try:
+        admins_list = getattr(config, "ADMIN_USER_IDS", None)
+        if admins_list:
+            admins = {int(x) for x in admins_list}
+    except Exception:
+        admins = None
+
+    offset: int | None = None
+    logger.info("Start-command poller is running on primary bot.")
+
+    notify_label: str | None = None
+    upgrades_label: str | None = None
+
+    # Пытаемся подтянуть читабельные имена каналов один раз
+    try:
+        notify_label = await _get_chat_label(config.NOTIFY_CHAT_ID)
+    except Exception:
+        notify_label = str(config.NOTIFY_CHAT_ID)
+
+    if getattr(config, "NOTIFY_UPGRADES_CHAT_ID", None):
+        try:
+            upgrades_label = await _get_chat_label(config.NOTIFY_UPGRADES_CHAT_ID)
+        except Exception:
+            upgrades_label = str(config.NOTIFY_UPGRADES_CHAT_ID)
+
+    while True:
+        try:
+            updates = await bot_send_request_primary(
+                "getUpdates",
+                {
+                    "timeout": long_poll_timeout,
+                    **({"offset": offset} if offset is not None else {})
+                }
+            )
+
+            if not updates:
+                continue
+
+            for update in updates:
+                try:
+                    update_id = update.get("update_id")
+                    if update_id is not None:
+                        offset = update_id + 1
+
+                    message = update.get("message") or update.get("channel_post") or {}
+                    text = (message.get("text") or "").strip()
+                    chat = message.get("chat") or {}
+                    chat_id = chat.get("id")
+                    from_user = message.get("from") or {}
+                    user_id = from_user.get("id")
+
+                    if not text or not chat_id:
+                        continue
+
+                    if text.lower().startswith("/start"):
+                        # Проверяем право триггерить тест в каналах (если список админов указан)
+                        allow_channel_test = (admins is None) or (isinstance(user_id, int) and user_id in admins)
+
+                        # Тестовые сообщения в канал(ы)
+                        sent_to_channels_info: list[str] = []
+                        if send_tests_to_channels and allow_channel_test:
+                            try:
+                                resp = await bot_send_request_primary(
+                                    "sendMessage",
+                                    {
+                                        "chat_id": config.NOTIFY_CHAT_ID,
+                                        "text": getattr(
+                                            config,
+                                            "START_TEST_NOTIFY_TEXT",
+                                            "🔔 Тест уведомлений: бот активен и готов отправлять сообщения."
+                                        )
+                                    } | BASIC_REQUEST_DATA
+                                )
+                                if resp:
+                                    sent_to_channels_info.append(f"в {notify_label}")
+                            except Exception as ex:
+                                logger.warning(f"Failed to send test to NOTIFY_CHAT_ID: {ex}")
+
+                            if getattr(config, "NOTIFY_UPGRADES_CHAT_ID", None):
+                                try:
+                                    resp2 = await bot_send_request_primary(
+                                        "sendMessage",
+                                        {
+                                            "chat_id": config.NOTIFY_UPGRADES_CHAT_ID,
+                                            "text": getattr(
+                                                config,
+                                                "START_TEST_UPGRADES_TEXT",
+                                                "⬆️ Тест канала апгрейдов: бот активен."
+                                            )
+                                        } | BASIC_REQUEST_DATA
+                                    )
+                                    if resp2:
+                                        sent_to_channels_info.append(f"в {upgrades_label}")
+                                except Exception as ex:
+                                    logger.warning(f"Failed to send test to NOTIFY_UPGRADES_CHAT_ID: {ex}")
+
+                        # Ответ пользователю
+                        ok_text_template = getattr(
+                            config,
+                            "START_REPLY_TEXT",
+                            (
+                                "✅ Детектор запущен и работает.\n"
+                                "Канал уведомлений: {notify}\n"
+                                "{upgrades_line}"
+                                "Интервал проверки: {interval}s\n"
+                                "Тест в каналы: {test_info}\n"
+                                "Если что — смотри логи в файле."
+                            )
+                        )
+
+                        upgrades_line = ""
+                        if getattr(config, "NOTIFY_UPGRADES_CHAT_ID", None):
+                            upgrades_line = f"Канал апгрейдов: {upgrades_label}\n"
+
+                        test_info = ("не отправлялся (нет прав)" if send_tests_to_channels and not allow_channel_test
+                                     else ("отправлен " + ", ".join(sent_to_channels_info)) if sent_to_channels_info
+                                     else ("не отправлялся" if not send_tests_to_channels else "ошибка/пропущен"))
+
+                        ok_text = ok_text_template.format(
+                            notify=notify_label,
+                            upgrades_line=upgrades_line,
+                            interval=config.CHECK_INTERVAL,
+                            test_info=test_info
+                        )
+
+                        await bot_send_request_primary(
+                            "sendMessage",
+                            {"chat_id": chat_id, "text": ok_text} | BASIC_REQUEST_DATA
+                        )
+
+                except Exception as inner_ex:
+                    logger.exception("Error while processing incoming update", exc_info=inner_ex)
+
+        except Exception as ex:
+            logger.warning(f"getUpdates loop error: {ex}")
+            await asyncio.sleep(2)
+
+
 async def logger_wrapper(coro: typing.Awaitable[T]) -> T | None:
     try:
         return await coro
@@ -661,6 +877,15 @@ async def main(save_only: bool=False) -> None:
 
     elif not save_only:
         logger.info("Upgrades channel is not set, skipping star gifts upgrades checking.")
+
+    # /start-поллер запускаем, если есть хотя бы один токен
+    if BOTS_AMOUNT > 0 and not save_only:
+        tasks.append(asyncio.create_task(logger_wrapper(
+            start_command_poller()
+        )))
+        logger.info("Start-command bot poller task started.")
+    elif not save_only:
+        logger.info("No bots available, skipping /start command poller.")
 
     tasks.append(asyncio.create_task(logger_wrapper(
         detector(
