@@ -5,32 +5,31 @@ import constants
 
 SESSION_NAME = "account"
 
-API_ID = 1234
-API_HASH = "1234"
+API_ID = 22712842
+API_HASH = "dd58254a4363da5381267eeeb944138f"
 
 BOT_TOKENS = [
-    "1234:abcd",
-    "2345:bcda",
-    "3456:cdef",
+    "8459649519:AAHZj7MbDI-PwxlWM--vD6mZ-qRTPLfRQSw",
+    "8206760054:AAFCpfxx6TXq3bpWKk-Ecq8oUiOTpGO9m_A",
 ]
 
 
-CHECK_INTERVAL = 1.
-CHECK_UPGRADES_PER_CYCLE = 2
+CHECK_INTERVAL = 3.0
+CHECK_UPGRADES_PER_CYCLE = 3
 
 DATA_FILEPATH = constants.WORK_DIRPATH / "star_gifts.json"
-DATA_SAVER_DELAY = 2.
-NOTIFY_CHAT_ID = -1002452764624  # https://t.me/gifts_detector
-NOTIFY_UPGRADES_CHAT_ID = -1002751596218  # https://t.me/gifts_upgrades_detector
+DATA_SAVER_DELAY = 3.0
+NOTIFY_CHAT_ID = -1003052155098  # https://t.me/gifts_detector
+NOTIFY_UPGRADES_CHAT_ID = -1003052155098  # https://t.me/gifts_upgrades_detector
                                           # Если не нужны апгрейды, установите в `None` или `9`.
                                           # Дополнительно: боты не могут проверять апгрейды подарков,
                                           # Telegram выдаст [400 BOT_METHOD_INVALID]
-NOTIFY_AFTER_STICKER_DELAY = 1.
-NOTIFY_AFTER_TEXT_DELAY = 2.
-TIMEZONE = "UTC"
+NOTIFY_AFTER_STICKER_DELAY = 1.0
+NOTIFY_AFTER_TEXT_DELAY = 2.0
+TIMEZONE = "Europe/Moscow"
 CONSOLE_LOG_LEVEL = logging.DEBUG
 FILE_LOG_LEVEL = logging.INFO
-HTTP_REQUEST_TIMEOUT = 20.
+HTTP_REQUEST_TIMEOUT = 20.0
 
 
 NOTIFY_TEXT = """\
